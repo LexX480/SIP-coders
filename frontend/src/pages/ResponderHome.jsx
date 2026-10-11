@@ -225,7 +225,7 @@ export default function ResponderHome() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-label-md text-label-md text-on-surface truncate">
-                        {LABELS[n.resourceType] || n.resourceType} — {wardLabel(n.ward)}
+                        {LABELS[n.resourceType] || n.resourceType} - {wardLabel(n.ward)}
                       </p>
                       <p className="font-caption text-caption text-on-surface-variant">
                         Reported {timeAgo(n.createdAt)}
