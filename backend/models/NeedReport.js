@@ -60,6 +60,18 @@ const needReportSchema = new mongoose.Schema(
       default: null,
     },
     claimedAt: { type: Date, default: null },
+
+    // A ward coordinator can hand this report off to a registered responder
+    // organization (a User with role "responder") so it shows up on that
+    // org's own dashboard. This is independent of claimedBy/status - it's a
+    // referral, not a claim, so the need stays open/claimable on your own
+    // responder list too unless/until someone actually claims it.
+    assignedTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    assignedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

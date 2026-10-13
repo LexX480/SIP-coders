@@ -53,6 +53,11 @@ export const unclaimNeed = (id) =>
 export const markNeedAddressed = (id) =>
   client.patch(`/needs/${id}/addressed`).then((r) => r.data);
 
+export const getResponders = () => client.get("/auth/responders").then((r) => r.data);
+export const assignNeed = (id, responderId) =>
+  client.patch(`/needs/${id}/assign`, { responderId }).then((r) => r.data);
+export const unassignNeed = (id) => client.patch(`/needs/${id}/unassign`).then((r) => r.data);
+
 // --- Alerts ------------------------------------------------------------
 export const getAlerts = (filters = {}) =>
   client.get("/alerts", { params: filters }).then((r) => r.data);

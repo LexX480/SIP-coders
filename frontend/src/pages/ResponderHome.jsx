@@ -44,10 +44,11 @@ export default function ResponderHome() {
     loadNeeds();
   }, []);
 
-  // Every need report, unsolved ones (open/claimed) first - most urgent
-  // first within that group - and solved (addressed) ones pushed to the
-  // bottom, most recently resolved first, so the list still shows the
-  // full picture without burying what still needs attention.
+  // Every need report, unsolved ones (open/claimed) first - and within that
+  // group, anything a ward coordinator has assigned to this organization
+  // comes first of all, so a transferred need doesn't get buried under
+  // everything else that's merely urgent. Most urgent next, then solved
+  // (addressed) ones pushed to the bottom, most recently resolved first.
   function loadNeeds() {
     getNeeds()
       .then((data) => {
@@ -57,6 +58,11 @@ export default function ResponderHome() {
           const bSolved = b.status === "addressed" ? 1 : 0;
           if (aSolved !== bSolved) return aSolved - bSolved;
           if (aSolved) return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
+
+          const aAssignedToMe = a.assignedTo && user?._id && a.assignedTo._id === user._id ? 1 : 0;
+          const bAssignedToMe = b.assignedTo && user?._id && b.assignedTo._id === user._id ? 1 : 0;
+          if (aAssignedToMe !== bAssignedToMe) return bAssignedToMe - aAssignedToMe;
+
           return (urgencyWeight[b.urgency] || 0) - (urgencyWeight[a.urgency] || 0);
         });
         setNeeds(sorted.slice(0, 8));
@@ -198,10 +204,11 @@ export default function ResponderHome() {
           </div>
 
           {/* Community needs reported nearby - unsolved (open/claimed) ones
-              first, most urgent first, solved (addressed) ones at the
-              bottom. Clicking a row opens the full report (including who
-              reported it) so a responder can claim it and handle the
-              relief themself. */}
+              first, anything assigned to this organization pinned at the
+              very top of that group, most urgent next, solved (addressed)
+              ones at the bottom. Clicking a row opens the full report
+              (including who reported it) so a responder can claim it and
+              handle the relief themself. */}
           <div className="p-space-md rounded-xl bg-surface-container-lowest border border-surface-container-highest shadow-sm mb-space-md">
             <div className="flex items-center justify-between mb-space-sm">
               <h2 className="font-headline-sm text-headline-sm text-on-surface">Community Needs Reported</h2>
@@ -212,13 +219,15 @@ export default function ResponderHome() {
             <div className="flex flex-col gap-space-xs">
               {needs.map((n) => {
                 const claimedByMe = n.claimedBy && user?._id && n.claimedBy._id === user._id;
+                const assignedToMe = n.assignedTo && user?._id && n.assignedTo._id === user._id;
                 const solved = n.status === "addressed";
                 return (
                   <button
                     key={n._id}
                     type="button"
                     onClick={() => openNeed(n)}
-                    className={`w-full flex items-center gap-space-sm p-space-sm rounded-lg hover:bg-surface-container-low text-left transition-colors ${solved ? "opacity-60" : ""}`}
+                    className={`w-full flex items-center gap-space-sm p-space-sm rounded-lg hover:bg-surface-container-low text-left transition-colors ${solved ? "opacity-60" : ""
+                      } ${assignedToMe && !solved ? "ring-1 ring-secondary/40 bg-secondary/5" : ""}`}
                   >
                     <div className="w-9 h-9 rounded-lg bg-surface-container flex items-center justify-center text-primary shrink-0">
                       <span className="material-symbols-outlined text-[18px]">{ICONS[n.resourceType] || "inventory_2"}</span>
@@ -236,6 +245,12 @@ export default function ResponderHome() {
                         )}
                       </p>
                     </div>
+                    {assignedToMe && !solved && (
+                      <span className="flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-label-sm bg-secondary/10 text-secondary shrink-0">
+                        <span className="material-symbols-outlined text-[14px]">call_split</span>
+                        Assigned to you
+                      </span>
+                    )}
                     <span
                       className={`flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-label-sm shrink-0 ${solved ? "bg-status-confirmed/10 text-status-confirmed" : "bg-status-pending/10 text-status-pending"
                         }`}
@@ -325,6 +340,7 @@ function NeedDetailModal({ need, currentUserId, loading, error, onClose, onClaim
   const subLabel = (SUBCATEGORIES[need.resourceType] || []).find((s) => s.value === need.subCategory)?.label;
   const claimedByMe = need.claimedBy && currentUserId && need.claimedBy._id === currentUserId;
   const claimedByOther = need.claimedBy && !claimedByMe;
+  const assignedToMe = need.assignedTo && currentUserId && need.assignedTo._id === currentUserId;
   const [lng, lat] = need.location?.coordinates || [];
 
   return (
@@ -358,7 +374,7 @@ function NeedDetailModal({ need, currentUserId, loading, error, onClose, onClaim
         </div>
 
         <div className="p-space-md">
-          <div className="flex items-center gap-space-sm mb-space-sm">
+          <div className="flex items-center flex-wrap gap-space-sm mb-space-sm">
             <StatusPill status={need.urgency} />
             <span
               className={`flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-label-sm ${need.status === "addressed" ? "bg-status-confirmed/10 text-status-confirmed" : "bg-status-pending/10 text-status-pending"
@@ -373,6 +389,12 @@ function NeedDetailModal({ need, currentUserId, loading, error, onClose, onClaim
                   }`}
               >
                 {claimedByMe ? "You're handling this" : `Claimed by ${need.claimedBy?.name || "a responder"}`}
+              </span>
+            )}
+            {assignedToMe && (
+              <span className="flex items-center gap-1 font-label-sm text-label-sm px-2.5 py-1 rounded-full bg-secondary/10 text-secondary">
+                <span className="material-symbols-outlined text-[14px]">call_split</span>
+                Assigned to your organization
               </span>
             )}
           </div>

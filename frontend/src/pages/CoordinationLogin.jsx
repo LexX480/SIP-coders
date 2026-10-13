@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginCoordination } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import Header from "../components/Header";
 
 const ROLES = [
   { value: "ward_committee", label: "Ward Disaster Committee" },
@@ -36,6 +37,7 @@ export default function CoordinationLogin() {
 
   return (
     <div className="min-h-screen flex flex-col justify-center items-center px-margin-mobile bg-surface">
+      <Header />
       <main className="w-full max-w-[480px] mx-auto py-space-xl">
         <div className="w-full bg-surface-container-lowest rounded-xl p-space-md md:p-space-lg shadow-sm border border-surface-container-highest">
           <div className="flex flex-col items-center text-center">

@@ -1,11 +1,13 @@
 const express = require("express");
 const { body, validationResult } = require("express-validator");
 const NeedReport = require("../models/NeedReport");
-const { optionalAuth, requireAuth } = require("../middleware/auth");
+const User = require("../models/User");
+const { optionalAuth, requireAuth, requireRole } = require("../middleware/auth");
 
 const router = express.Router();
 
 const RESOURCE_TYPES = ["food", "water", "shelter", "medical", "electrical", "clothing"];
+const COORDINATOR_ROLES = ["ward_committee", "ndrrma", "cluster_lead"];
 
 // ---------------------------------------------------------------------
 // POST /api/needs  (Screen 6: Report a Need)
@@ -65,7 +67,9 @@ router.get("/", optionalAuth, async (req, res) => {
 
     let query = NeedReport.find(filter).populate("ward", "name district locality").sort({ createdAt: -1 });
     if (req.user) {
-      query = query.populate("claimedBy", "name");
+      query = query
+        .populate("claimedBy", "name")
+        .populate("assignedTo", "organizationName");
     } else {
       query = query.select("-reporterName -reporterPhone");
     }
@@ -96,11 +100,12 @@ router.post("/:id/claim", requireAuth, async (req, res) => {
     report.status = "claimed";
     report.claimedBy = req.user.id;
     report.claimedAt = new Date();
-    await report.save();
+    await report.save({ validateModifiedOnly: true });
 
     const populated = await report.populate([
       { path: "ward", select: "name district locality" },
       { path: "claimedBy", select: "name" },
+      { path: "assignedTo", select: "organizationName" },
     ]);
     res.json(populated);
   } catch (err) {
@@ -119,7 +124,7 @@ router.post("/:id/unclaim", requireAuth, async (req, res) => {
     if (!report) return res.status(404).json({ message: "Need report not found" });
 
     const isOwner = String(report.claimedBy) === String(req.user.id);
-    const isCoordinator = ["ward_committee", "ndrrma", "cluster_lead"].includes(req.user.role);
+    const isCoordinator = COORDINATOR_ROLES.includes(req.user.role);
     if (report.status === "claimed" && !isOwner && !isCoordinator) {
       return res.status(403).json({ message: "Only the responder handling this (or a coordinator) can release it" });
     }
@@ -127,14 +132,18 @@ router.post("/:id/unclaim", requireAuth, async (req, res) => {
     report.status = "open";
     report.claimedBy = null;
     report.claimedAt = null;
-    await report.save();
+    await report.save({ validateModifiedOnly: true });
 
-    const populated = await report.populate({ path: "ward", select: "name district locality" });
+    const populated = await report.populate([
+      { path: "ward", select: "name district locality" },
+      { path: "assignedTo", select: "organizationName" },
+    ]);
     res.json(populated);
   } catch (err) {
     res.status(500).json({ message: "Could not release this need", error: err.message });
   }
 });
+
 // ---------------------------------------------------------------------
 // PATCH /api/needs/:id/addressed - called right after a responder submits
 // a Distribution that was logged against a claimed need, closing the loop:
@@ -146,12 +155,76 @@ router.patch("/:id/addressed", requireAuth, async (req, res) => {
     if (!report) return res.status(404).json({ message: "Need report not found" });
 
     report.status = "addressed";
-    await report.save();
+    await report.save({ validateModifiedOnly: true });
 
-    const populated = await report.populate({ path: "ward", select: "name district locality" });
+    const populated = await report.populate([
+      { path: "ward", select: "name district locality" },
+      { path: "assignedTo", select: "organizationName" },
+    ]);
     res.json(populated);
   } catch (err) {
     res.status(500).json({ message: "Could not update this need", error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------
+// PATCH /api/needs/:id/assign - a ward coordinator hands this report off
+// to a registered responder organization. This is a referral, not a claim:
+// it doesn't touch status/claimedBy, it just sets who the report has been
+// handed to, so it can show up on that organization's own dashboard. Only
+// coordination roles can do this (not responders themselves).
+// ---------------------------------------------------------------------
+router.patch(
+  "/:id/assign",
+  requireAuth,
+  requireRole(...COORDINATOR_ROLES),
+  [body("responderId").notEmpty().withMessage("Choose an organization to transfer this to")],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    try {
+      const responder = await User.findOne({ _id: req.body.responderId, role: "responder" });
+      if (!responder) return res.status(404).json({ message: "That organization could not be found" });
+
+      const report = await NeedReport.findById(req.params.id);
+      if (!report) return res.status(404).json({ message: "Need report not found" });
+
+      report.assignedTo = responder._id;
+      report.assignedAt = new Date();
+      await report.save({ validateModifiedOnly: true });
+
+      const populated = await report.populate([
+        { path: "ward", select: "name district locality" },
+        { path: "claimedBy", select: "name" },
+        { path: "assignedTo", select: "organizationName" },
+      ]);
+      res.json(populated);
+    } catch (err) {
+      res.status(500).json({ message: "Could not transfer this need", error: err.message });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------
+// PATCH /api/needs/:id/unassign - undo a transfer (coordination roles only).
+// ---------------------------------------------------------------------
+router.patch("/:id/unassign", requireAuth, requireRole(...COORDINATOR_ROLES), async (req, res) => {
+  try {
+    const report = await NeedReport.findById(req.params.id);
+    if (!report) return res.status(404).json({ message: "Need report not found" });
+
+    report.assignedTo = null;
+    report.assignedAt = null;
+    await report.save({ validateModifiedOnly: true });
+
+    const populated = await report.populate([
+      { path: "ward", select: "name district locality" },
+      { path: "claimedBy", select: "name" },
+    ]);
+    res.json(populated);
+  } catch (err) {
+    res.status(500).json({ message: "Could not remove this transfer", error: err.message });
   }
 });
 

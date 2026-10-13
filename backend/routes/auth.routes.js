@@ -1,7 +1,7 @@
 const express = require("express");
 const { body, validationResult } = require("express-validator");
 const User = require("../models/User");
-const { signToken } = require("../middleware/auth");
+const { signToken, requireAuth, requireRole } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -141,6 +141,27 @@ router.post(
       res.status(201).json({ token, user: user.toSafeJSON() });
     } catch (err) {
       res.status(500).json({ message: "Registration failed", error: err.message });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------
+// GET /api/auth/responders - list registered responder organizations, for
+// a ward coordinator to pick from when transferring a need report. Only
+// coordination roles can see this list.
+// ---------------------------------------------------------------------
+router.get(
+  "/responders",
+  requireAuth,
+  requireRole("ward_committee", "ndrrma", "cluster_lead"),
+  async (req, res) => {
+    try {
+      const responders = await User.find({ role: "responder" })
+        .select("organizationName verified")
+        .sort({ organizationName: 1 });
+      res.json(responders);
+    } catch (err) {
+      res.status(500).json({ message: "Could not load organizations", error: err.message });
     }
   }
 );
