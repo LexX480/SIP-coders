@@ -5,11 +5,13 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 
 const router = express.Router();
 
-const COORD_ROLES = ["ward_committee", "ndrrma", "cluster_lead"];
+const COORDINATOR_ROLES = ["ward_committee", "ndrrma", "cluster_lead"];
 
-// GET /api/alerts - used for the "Active Duplication Alerts" stat +
-// coordination dashboard alert list. Coordination roles only.
-router.get("/", requireAuth, requireRole(...COORD_ROLES), async (req, res) => {
+// ---------------------------------------------------------------------
+// GET /api/alerts - list, optionally filtered by status. Covers both
+// kind: "distribution" and kind: "need" alerts on the same list.
+// ---------------------------------------------------------------------
+router.get("/", requireAuth, requireRole(...COORDINATOR_ROLES), async (req, res) => {
   try {
     const filter = {};
     if (req.query.status) filter.status = req.query.status;
@@ -24,10 +26,10 @@ router.get("/", requireAuth, requireRole(...COORD_ROLES), async (req, res) => {
 });
 
 // ---------------------------------------------------------------------
-// GET /api/alerts/:id  (Screen 10: Duplication Alert Detail)
-// "3 organizations reported delivering tents here"
+// GET /api/alerts/:id - detail view. Populates whichever of
+// distributions/needs applies to this alert's kind.
 // ---------------------------------------------------------------------
-router.get("/:id", requireAuth, requireRole(...COORD_ROLES), async (req, res) => {
+router.get("/:id", requireAuth, requireRole(...COORDINATOR_ROLES), async (req, res) => {
   try {
     const alert = await DuplicationAlert.findById(req.params.id)
       .populate("ward", "name district")
@@ -37,6 +39,10 @@ router.get("/:id", requireAuth, requireRole(...COORD_ROLES), async (req, res) =>
           { path: "organization", select: "organizationName" },
           { path: "ward", select: "name" },
         ],
+      })
+      .populate({
+        path: "needs",
+        populate: { path: "ward", select: "name" },
       });
 
     if (!alert) return res.status(404).json({ message: "Alert not found" });
@@ -46,8 +52,7 @@ router.get("/:id", requireAuth, requireRole(...COORD_ROLES), async (req, res) =>
   }
 });
 
-// POST /api/alerts/:id/confirm  ("Confirm Duplicate" button)
-router.post("/:id/confirm", requireAuth, requireRole(...COORD_ROLES), async (req, res) => {
+router.post("/:id/confirm", requireAuth, requireRole(...COORDINATOR_ROLES), async (req, res) => {
   try {
     const alert = await DuplicationAlert.findByIdAndUpdate(
       req.params.id,
@@ -61,8 +66,7 @@ router.post("/:id/confirm", requireAuth, requireRole(...COORD_ROLES), async (req
   }
 });
 
-// POST /api/alerts/:id/dismiss  ("Dismiss Alert" button)
-router.post("/:id/dismiss", requireAuth, requireRole(...COORD_ROLES), async (req, res) => {
+router.post("/:id/dismiss", requireAuth, requireRole(...COORDINATOR_ROLES), async (req, res) => {
   try {
     const alert = await DuplicationAlert.findByIdAndUpdate(
       req.params.id,
@@ -71,11 +75,15 @@ router.post("/:id/dismiss", requireAuth, requireRole(...COORD_ROLES), async (req
     );
     if (!alert) return res.status(404).json({ message: "Alert not found" });
 
-    // Dismissing clears the duplicate flag off the underlying distributions
-    await Distribution.updateMany(
-      { _id: { $in: alert.distributions } },
-      { $set: { status: "confirmed" }, $unset: { duplicateNote: "" } }
-    );
+    // Dismissing a distribution-kind alert clears the duplicate flag off
+    // the underlying distributions. Need-kind alerts never mutate the
+    // underlying NeedReport documents, so there's nothing to clear there.
+    if (alert.kind === "distribution" && alert.distributions.length) {
+      await Distribution.updateMany(
+        { _id: { $in: alert.distributions } },
+        { $set: { status: "confirmed" }, $unset: { duplicateNote: "" } }
+      );
+    }
 
     res.json(alert);
   } catch (err) {

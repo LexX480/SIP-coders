@@ -3,6 +3,7 @@ const { body, validationResult } = require("express-validator");
 const NeedReport = require("../models/NeedReport");
 const User = require("../models/User");
 const { optionalAuth, requireAuth, requireRole } = require("../middleware/auth");
+const { checkNeedForDuplication } = require("../utils/needDuplicationEngine");
 
 const router = express.Router();
 
@@ -42,6 +43,12 @@ router.post(
         reporterName: req.body.reporterName,
         reporterPhone: req.body.reporterPhone,
       });
+
+      // Fire-and-check: flag this ward+resourceType as a possible duplicate
+      // cluster if 2+ open reports now overlap. Never blocks the response -
+      // a reporter's submission should never fail because of this.
+      await checkNeedForDuplication(report);
+
       res.status(201).json(report);
     } catch (err) {
       res.status(500).json({ message: "Could not submit report", error: err.message });

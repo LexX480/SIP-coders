@@ -59,16 +59,10 @@ export const assignNeed = (id, responderId) =>
 export const unassignNeed = (id) => client.patch(`/needs/${id}/unassign`).then((r) => r.data);
 
 // --- Alerts ------------------------------------------------------------
-export const getAlerts = (filters = {}) =>
-  client.get("/alerts", { params: filters }).then((r) => r.data);
-
+export const getAlerts = (status) => client.get("/alerts", { params: status ? { status } : {} }).then((r) => r.data);
 export const getAlert = (id) => client.get(`/alerts/${id}`).then((r) => r.data);
-
-export const confirmAlert = (id) =>
-  client.post(`/alerts/${id}/confirm`).then((r) => r.data);
-
-export const dismissAlert = (id) =>
-  client.post(`/alerts/${id}/dismiss`).then((r) => r.data);
+export const confirmAlert = (id) => client.post(`/alerts/${id}/confirm`).then((r) => r.data);
+export const dismissAlert = (id) => client.post(`/alerts/${id}/dismiss`).then((r) => r.data);
 
 // --- Analytics ----------------------------------------------------------
 export const getVolumeOverTime = () =>
