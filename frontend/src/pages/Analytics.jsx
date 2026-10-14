@@ -178,10 +178,17 @@ export default function Analytics() {
                 )}
               </div>
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={volume} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+
+                <AreaChart data={volume} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E3DE" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} tickLine={false} axisLine={{ stroke: "#E5E3DE" }} />
-                  <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={32} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={{ stroke: "#E5E3DE" }}
+                    padding={{ left: 24, right: 24 }}
+                  />
+                  <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
                   <Tooltip content={<CustomTooltip suffix="units" />} />
                   <Area
                     type="monotone"
@@ -203,10 +210,10 @@ export default function Analytics() {
                 Resource allocation by category
               </h2>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={byCategory} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                <BarChart data={byCategory} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E3DE" vertical={false} />
                   <XAxis dataKey="resourceType" tick={{ fontSize: 11 }} tickLine={false} axisLine={{ stroke: "#E5E3DE" }} />
-                  <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={32} />
+                  <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
                   <Tooltip content={<CustomTooltip suffix="units" />} cursor={{ fill: "rgba(0,0,0,0.03)" }} />
                   <Bar dataKey="totalQuantity" radius={[6, 6, 0, 0]} animationDuration={900}>
                     {byCategory.map((entry) => (

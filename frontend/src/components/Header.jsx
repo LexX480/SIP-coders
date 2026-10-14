@@ -17,6 +17,7 @@ const RESPONDER_LINKS_LOGGED_IN = [
 const RESPONDER_LINKS_LOGGED_OUT = [
   { path: "/", label: "Home" },
   { path: "/responder/home", label: "Responder Portal" },
+  { path: "/transparency", label: "Public Transparency" },
 ];
 
 const COORDINATION_LINKS = [

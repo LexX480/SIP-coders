@@ -108,8 +108,8 @@ export default function DuplicationAlerts() {
                 key={f.value}
                 onClick={() => setFilter(f.value)}
                 className={`px-3.5 py-1.5 rounded-full font-label-md text-label-md transition-colors ${filter === f.value
-                    ? "bg-primary text-on-primary"
-                    : "bg-surface-container text-on-surface-variant hover:bg-surface-container-highest"
+                  ? "bg-primary text-on-primary"
+                  : "bg-surface-container text-on-surface-variant hover:bg-surface-container-highest"
                   }`}
               >
                 {f.label}
@@ -142,7 +142,7 @@ export default function DuplicationAlerts() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <p className="font-label-md text-label-md text-on-surface">
-                          {a.ward?.name} — {a.resourceType}
+                          {a.ward?.name} - {a.resourceType}
                         </p>
                         <span className="font-caption text-caption text-on-surface-variant bg-surface-container px-1.5 py-0.5 rounded-full">
                           {meta.label}
@@ -183,7 +183,7 @@ export default function DuplicationAlerts() {
                 <div className="flex items-start gap-2 mb-space-sm">
                   <span className="material-symbols-outlined text-secondary text-[18px] mt-0.5">groups</span>
                   <p className="font-caption text-caption text-on-surface-variant">
-                    <span className="text-on-surface font-label-sm">Need overlap</span> — 2+ open reports for the
+                    <span className="text-on-surface font-label-sm">Need overlap</span> - 2+ open reports for the
                     same resource in the same ward within 48 hours, e.g. neighbors or family members reporting the
                     same need.
                   </p>
@@ -191,7 +191,7 @@ export default function DuplicationAlerts() {
                 <div className="flex items-start gap-2">
                   <span className="material-symbols-outlined text-primary text-[18px] mt-0.5">content_copy</span>
                   <p className="font-caption text-caption text-on-surface-variant">
-                    <span className="text-on-surface font-label-sm">Distribution overlap</span> — 2+ organizations
+                    <span className="text-on-surface font-label-sm">Distribution overlap</span> - 2+ organizations
                     logging the same resource delivered in the same ward within the same window.
                   </p>
                 </div>
