@@ -271,15 +271,6 @@ export default function ResponderHome() {
             </div>
           </div>
 
-          {/* Device/session meta row - decorative telemetry, wire up later if useful */}
-          <div className="flex flex-wrap items-center justify-between gap-space-sm px-1">
-            <span className="font-caption text-caption text-on-surface-variant flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[14px]">devices</span>
-              Authenticated Device ID: {user?._id ? user._id.slice(-8).toUpperCase() : "KMD-OPS-772"}
-            </span>
-            <span className="font-caption text-caption text-on-surface-variant">Bandwidth: High / Stable</span>
-            <span className="font-caption text-caption text-on-surface-variant">Offline Queue: Empty</span>
-          </div>
         </div>
       </main>
       <Footer />
@@ -465,7 +456,7 @@ function NeedDetailModal({ need, currentUserId, loading, error, onClose, onClaim
 
           {claimedByOther && (
             <p className="font-caption text-caption text-on-surface-variant text-center py-space-xs">
-              Already being handled — check back if it isn't resolved soon.
+              Already being handled - check back if it isn't resolved soon.
             </p>
           )}
         </div>
