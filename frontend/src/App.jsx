@@ -14,6 +14,10 @@ import CoordinationDashboard from "./pages/CoordinationDashboard";
 import DuplicationAlerts from "./pages/DuplicationAlerts";
 import DuplicationAlertDetail from "./pages/DuplicationAlertDetail";
 import Analytics from "./pages/Analytics";
+import DropoffMaterial from "./pages/DropoffMaterial";
+import Warehouses from "./pages/Warehouses";
+import WarehouseInventory from "./pages/WarehouseInventory";
+
 
 export default function App() {
   return (
@@ -51,6 +55,11 @@ export default function App() {
           {/* Batch 2 - Community needs + public transparency */}
           <Route path="/needs/report" element={<ReportNeed />} />
           <Route path="/transparency" element={<PublicTransparency />} />
+
+          {/* WareHouse mgmt */}
+          <Route path="/dropoff" element={<DropoffMaterial />} />
+          <Route path="/coordination/warehouses" element={<Warehouses />} />
+          <Route path="/coordination/warehouses/:id" element={<WarehouseInventory />} />
 
           {/* Batch 3 - Coordination console */}
           <Route path="/coordination/login" element={<CoordinationLogin />} />

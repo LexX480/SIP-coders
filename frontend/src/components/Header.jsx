@@ -3,13 +3,12 @@ import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import EmergencyContacts from "./EmergencyContacts";
 
-// Full nav - only shown once a responder is actually logged in, since these
-// pages (logging, my distributions) require that account anyway.
 const RESPONDER_LINKS_LOGGED_IN = [
   { path: "/", label: "Home" },
   { path: "/responder/home", label: "Responder Portal" },
   { path: "/responder/log", label: "Log Distribution" },
   { path: "/responder/distributions", label: "My Distributions" },
+  { path: "/dropoff", label: "Drop Off Materials" },
   { path: "/transparency", label: "Public Transparency" },
 ];
 
@@ -17,12 +16,14 @@ const RESPONDER_LINKS_LOGGED_IN = [
 const RESPONDER_LINKS_LOGGED_OUT = [
   { path: "/", label: "Home" },
   { path: "/responder/home", label: "Responder Portal" },
+  { path: "/dropoff", label: "Drop Off Materials" },
   { path: "/transparency", label: "Public Transparency" },
 ];
 
 const COORDINATION_LINKS = [
   { path: "/coordination/dashboard", label: "Dashboard" },
   { path: "/coordination/alerts", label: "Duplication Alerts" },
+  { path: "/coordination/warehouses", label: "Warehouses" },
   { path: "/coordination/analytics", label: "Analytics" },
 ];
 

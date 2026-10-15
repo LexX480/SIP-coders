@@ -79,3 +79,32 @@ export const getCoordinationDashboard = () =>
   client.get("/dashboard/coordination").then((r) => r.data);
 
 export default client;
+
+
+// --- Warehouses & inventory ---------------------------------------------
+export const getWarehouses = (ward) =>
+  client.get("/warehouses", { params: ward ? { ward } : {} }).then((r) => r.data);
+
+export const getWarehouse = (id) => client.get(`/warehouses/${id}`).then((r) => r.data);
+
+export const createWarehouse = (payload) =>
+  client.post("/warehouses", payload).then((r) => r.data);
+
+export const getWarehouseInventory = (id) =>
+  client.get(`/warehouses/${id}/inventory`).then((r) => r.data);
+
+export const adjustInventory = (id, payload) =>
+  client.post(`/warehouses/${id}/inventory/adjust`, payload).then((r) => r.data);
+
+// --- Drop-offs ------------------------------------------------------------
+export const submitDropoff = (payload) =>
+  client.post("/dropoffs", payload).then((r) => r.data);
+
+export const getDropoffs = (filters = {}) =>
+  client.get("/dropoffs", { params: filters }).then((r) => r.data);
+
+export const confirmDropoff = (id, confirmedQuantity) =>
+  client.patch(`/dropoffs/${id}/confirm`, confirmedQuantity ? { confirmedQuantity } : {}).then((r) => r.data);
+
+export const cancelDropoff = (id, note) =>
+  client.patch(`/dropoffs/${id}/cancel`, note ? { note } : {}).then((r) => r.data);
