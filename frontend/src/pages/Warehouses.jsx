@@ -10,6 +10,50 @@ function wardLabel(ward) {
   return [ward.name, district, ward.locality].filter(Boolean).join(", ");
 }
 
+// Great-circle distance in km - plenty accurate for picking the nearest
+// ward centroid over Nepal-scale distances.
+function distanceKm([lng1, lat1], [lng2, lat2]) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function findNearestWard(wards, [lng, lat]) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const w of wards) {
+    if (!w.location?.coordinates) continue;
+    const d = distanceKm(w.location.coordinates, [lng, lat]);
+    if (d < bestDist) {
+      bestDist = d;
+      best = w;
+    }
+  }
+  return best;
+}
+
+// Reverse-geocodes a point to a short street/landmark string via Nominatim
+// (OpenStreetMap), the same tile provider MapPicker already uses. Falls
+// back to null on any failure - the field just stays empty for manual entry.
+async function reverseGeocodeAddress(lat, lng) {
+  const res = await fetch(
+    `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+    { headers: { Accept: "application/json" } }
+  );
+  if (!res.ok) throw new Error("reverse geocode failed");
+  const data = await res.json();
+  const a = data.address || {};
+  const parts = [
+    a.road || a.pedestrian || a.neighbourhood,
+    a.suburb && a.suburb !== (a.road || a.pedestrian) ? a.suburb : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join(", ") : data.display_name || null;
+}
+
 export default function Warehouses() {
   const [warehouses, setWarehouses] = useState([]);
   const [wards, setWards] = useState([]);
@@ -23,6 +67,13 @@ export default function Warehouses() {
   const [contactPhone, setContactPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
+  const [autoFilling, setAutoFilling] = useState(false);
+  const [wardAutoFilled, setWardAutoFilled] = useState(false);
+  const [addressAutoFilled, setAddressAutoFilled] = useState(false);
+  const [coordsAutoFilled, setCoordsAutoFilled] = useState(false);
+  const [latInput, setLatInput] = useState("");
+  const [lngInput, setLngInput] = useState("");
+  const [coordsError, setCoordsError] = useState("");
 
   function loadWarehouses() {
     getWarehouses()
@@ -42,6 +93,61 @@ export default function Warehouses() {
     setLocation(null);
     setContactPhone("");
     setFormError("");
+    setWardAutoFilled(false);
+    setAddressAutoFilled(false);
+    setCoordsAutoFilled(false);
+    setLatInput("");
+    setLngInput("");
+    setCoordsError("");
+  }
+
+  // Dropping or moving the pin auto-fills ward (nearest ward centroid,
+  // computed locally), address (reverse-geocoded street/landmark), and the
+  // coordinate fields below - all stay normal, editable inputs, so picking
+  // a different ward, retyping the address, or editing the coordinates
+  // afterward simply overrides the suggestion.
+  async function handleLocationChange(coords) {
+    setLocation(coords);
+    setLatInput(coords[1].toFixed(6));
+    setLngInput(coords[0].toFixed(6));
+    setCoordsAutoFilled(true);
+    setCoordsError("");
+    setAutoFilling(true);
+
+    const nearest = findNearestWard(wards, coords);
+    if (nearest) {
+      setWard(nearest._id);
+      setWardAutoFilled(true);
+    }
+
+    try {
+      const addr = await reverseGeocodeAddress(coords[1], coords[0]);
+      if (addr) {
+        setAddress(addr);
+        setAddressAutoFilled(true);
+      }
+    } catch {
+      // Reverse geocoding is a convenience, not a requirement - the address
+      // field is still right there to fill in by hand.
+    } finally {
+      setAutoFilling(false);
+    }
+  }
+
+  // Lets someone type exact coordinates instead of tapping the map - e.g.
+  // pasted in from another source. Treated the same as dropping a pin: it
+  // moves the map marker and re-runs the ward/address lookup for that point.
+  function handleCoordsApply() {
+    const lat = parseFloat(latInput);
+    const lng = parseFloat(lngInput);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      return setCoordsError("Enter both latitude and longitude as numbers.");
+    }
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      return setCoordsError("Latitude must be -90 to 90, longitude -180 to 180.");
+    }
+    setCoordsError("");
+    handleLocationChange([lng, lat]);
   }
 
   async function handleCreate(e) {
@@ -115,11 +221,21 @@ export default function Warehouses() {
                   />
                 </div>
                 <div className="flex flex-col space-y-1.5">
-                  <label className="font-label-md text-label-md text-on-surface">Ward</label>
+                  <label className="font-label-md text-label-md text-on-surface flex items-center gap-1.5">
+                    Ward
+                    {wardAutoFilled && (
+                      <span className="font-caption text-caption text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
+                        Auto-filled
+                      </span>
+                    )}
+                  </label>
                   <select
                     required
                     value={ward}
-                    onChange={(e) => setWard(e.target.value)}
+                    onChange={(e) => {
+                      setWard(e.target.value);
+                      setWardAutoFilled(false);
+                    }}
                     className="w-full h-11 px-3.5 bg-surface-container-lowest text-on-surface font-body-md text-body-md rounded-lg border border-surface-container-highest focus:outline-none focus:border-primary transition-colors cursor-pointer"
                   >
                     <option value="">Select a ward</option>
@@ -133,19 +249,85 @@ export default function Warehouses() {
               </div>
 
               <div className="flex flex-col space-y-1.5">
-                <label className="font-label-md text-label-md text-on-surface">Address</label>
+                <label className="font-label-md text-label-md text-on-surface flex items-center gap-1.5">
+                  Address
+                  {addressAutoFilled && (
+                    <span className="font-caption text-caption text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
+                      Auto-filled
+                    </span>
+                  )}
+                </label>
                 <input
                   required
                   value={address}
-                  onChange={(e) => setAddress(e.target.value)}
+                  onChange={(e) => {
+                    setAddress(e.target.value);
+                    setAddressAutoFilled(false);
+                  }}
                   className="w-full h-11 px-3.5 bg-surface-container-lowest text-on-surface font-body-md text-body-md rounded-lg border border-surface-container-highest focus:outline-none focus:border-primary transition-colors"
                   placeholder="Street / landmark, so donors can find it"
                 />
+                <p className="font-caption text-caption text-on-surface-variant">
+                  Filled in automatically from the pin below - edit freely if it's not quite right.
+                </p>
               </div>
 
               <div className="flex flex-col space-y-1.5">
-                <label className="font-label-md text-label-md text-on-surface">Location</label>
-                <MapPicker value={location} onChange={setLocation} autoRequest={false} />
+                <label className="font-label-md text-label-md text-on-surface flex items-center gap-1.5">
+                  Coordinates
+                  {coordsAutoFilled && (
+                    <span className="font-caption text-caption text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
+                      Auto-filled
+                    </span>
+                  )}
+                </label>
+                <div className="flex items-center gap-space-sm flex-wrap">
+                  <input
+                    value={latInput}
+                    onChange={(e) => {
+                      setLatInput(e.target.value);
+                      setCoordsAutoFilled(false);
+                    }}
+                    inputMode="decimal"
+                    className="w-full sm:w-[150px] h-11 px-3.5 bg-surface-container-lowest text-on-surface font-body-md text-body-md rounded-lg border border-surface-container-highest focus:outline-none focus:border-primary transition-colors"
+                    placeholder="Latitude"
+                  />
+                  <input
+                    value={lngInput}
+                    onChange={(e) => {
+                      setLngInput(e.target.value);
+                      setCoordsAutoFilled(false);
+                    }}
+                    inputMode="decimal"
+                    className="w-full sm:w-[150px] h-11 px-3.5 bg-surface-container-lowest text-on-surface font-body-md text-body-md rounded-lg border border-surface-container-highest focus:outline-none focus:border-primary transition-colors"
+                    placeholder="Longitude"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCoordsApply}
+                    className="h-11 px-space-md rounded-lg border border-surface-container-highest font-label-md text-label-md text-on-surface hover:bg-surface-container transition-colors shrink-0"
+                  >
+                    Use these coordinates
+                  </button>
+                </div>
+                {coordsError && <p className="font-caption text-caption text-status-critical">{coordsError}</p>}
+                <p className="font-caption text-caption text-on-surface-variant">
+                  Filled in automatically when you pin the location on the map - or type coordinates here and apply
+                  them to move the pin.
+                </p>
+              </div>
+
+              <div className="flex flex-col space-y-1.5">
+                <label className="font-label-md text-label-md text-on-surface flex items-center gap-1.5">
+                  Location
+                  {autoFilling && (
+                    <span className="font-caption text-caption text-on-surface-variant flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px] animate-spin">sync</span>
+                      Looking up ward &amp; address...
+                    </span>
+                  )}
+                </label>
+                <MapPicker value={location} onChange={handleLocationChange} autoRequest={false} />
               </div>
 
               <div className="flex flex-col space-y-1.5 max-w-[280px]">

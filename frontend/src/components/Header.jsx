@@ -49,38 +49,38 @@ export default function Header({ variant = "responder" }) {
   if (variant === "coordination") {
     return (
       <header className="fixed top-0 left-0 right-0 z-50 bg-surface/95 backdrop-blur-md shadow-[0_1px_8px_rgba(20,20,20,0.04)]">
-        <div className="h-16 max-w-[1120px] mx-auto px-margin-mobile lg:px-margin flex items-center justify-between">
-          <div className="flex items-center gap-space-sm">
-            <img src="/logo-icon.png" alt="SaajhaRahat" className="w-9 h-9 object-contain rounded-md" />
-            <div className="flex flex-col">
-              <span className="font-headline-sm text-headline-sm text-primary tracking-tight">
-                SaajhaRahat Coordination Console
+        <div className="h-16 max-w-[1240px] mx-auto px-margin-mobile lg:px-margin flex items-center justify-between gap-space-sm">
+          <div className="flex items-center gap-space-sm min-w-0 shrink-0">
+            <img src="/logo-icon.png" alt="SaajhaRahat" className="w-9 h-9 object-contain rounded-md shrink-0" />
+            <div className="flex flex-col min-w-0">
+              <span className="font-headline-sm text-headline-sm text-primary tracking-tight whitespace-nowrap">
+                SaajhaRahat <span className="hidden xl:inline">Coordination Console</span>
               </span>
-              <span className="font-label-sm text-label-sm text-on-surface-variant">
+              <span className="font-label-sm text-label-sm text-on-surface-variant whitespace-nowrap hidden sm:block">
                 Ward &amp; Cluster Response
               </span>
             </div>
           </div>
-          <nav className="hidden md:flex items-center gap-space-md">
+          <nav className="hidden md:flex items-center gap-0.5 shrink-0">
             {COORDINATION_LINKS.map((link) => (
               <Link
                 key={link.path}
                 to={link.path}
                 className={
                   location.pathname === link.path
-                    ? "transition-colors bg-primary-container text-on-primary font-label-md text-label-md rounded-lg px-space-xs py-1"
-                    : "font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors"
+                    ? "whitespace-nowrap transition-colors bg-primary-container text-on-primary font-label-sm text-label-sm rounded-lg px-2.5 py-1.5"
+                    : "whitespace-nowrap font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface px-2.5 py-1.5 rounded-lg hover:bg-surface-container transition-colors"
                 }
               >
                 {link.label}
               </Link>
             ))}
           </nav>
-          <div className="flex items-center gap-space-sm">
+          <div className="flex items-center gap-1.5 shrink-0">
             {isCoordination && (
-              <div className="hidden sm:flex items-center gap-space-xs bg-surface-container-high px-space-sm py-1 rounded-full">
-                <span className="w-1.5 h-1.5 rounded-full bg-secondary-container" />
-                <span className="font-label-sm text-label-sm text-on-surface">
+              <div className="hidden lg:flex items-center gap-space-xs bg-surface-container-high px-space-sm py-1 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full bg-secondary-container shrink-0" />
+                <span className="font-label-sm text-label-sm text-on-surface whitespace-nowrap">
                   {user?.fullName || "Coordinator"}
                 </span>
               </div>
@@ -88,7 +88,7 @@ export default function Header({ variant = "responder" }) {
             <EmergencyContacts />
             <button
               onClick={logout}
-              className="w-8 h-8 rounded-full bg-primary flex items-center justify-center"
+              className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"
               title="Log out"
             >
               <span className="material-symbols-outlined text-on-primary text-[18px]">logout</span>
@@ -103,20 +103,22 @@ export default function Header({ variant = "responder" }) {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-surface/90 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.03)]">
-      <div className="h-16 max-w-[1120px] mx-auto px-gutter flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-space-sm">
-          <img src="/logo-icon.png" alt="SaajhaRahat" className="w-9 h-9 object-contain rounded-md" />
-          <span className="font-headline-sm text-headline-sm text-primary tracking-tight">SaajhaRahat</span>
+      <div className="h-16 max-w-[1280px] mx-auto px-gutter flex items-center justify-between gap-space-sm">
+        <Link to="/" className="flex items-center gap-space-sm shrink-0">
+          <img src="/logo-icon.png" alt="SaajhaRahat" className="w-9 h-9 object-contain rounded-md shrink-0" />
+          <span className="font-headline-sm text-headline-sm text-primary tracking-tight whitespace-nowrap">
+            SaajhaRahat
+          </span>
         </Link>
-        <nav className="hidden md:flex items-center gap-space-xs">
+        <nav className="hidden md:flex items-center gap-0.5 shrink-0 min-w-0">
           {links.map((link) => (
             <Fragment key={link.path}>
               <Link
                 to={link.path}
                 className={
                   location.pathname === link.path
-                    ? "px-3 py-2 transition-colors bg-primary-container text-on-primary font-label-md text-label-md rounded-lg"
-                    : "px-3 py-2 font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-lg transition-colors"
+                    ? "whitespace-nowrap px-2.5 py-1.5 transition-colors bg-primary-container text-on-primary font-label-sm text-label-sm rounded-lg"
+                    : "whitespace-nowrap px-2.5 py-1.5 font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-lg transition-colors"
                 }
               >
                 {link.label}
@@ -125,7 +127,8 @@ export default function Header({ variant = "responder" }) {
             </Fragment>
           ))}
         </nav>
-        <div className="flex items-center gap-space-sm">
+        <div className="flex items-center gap-space-sm shrink-0">
+
           {user ? (
             <button
               onClick={logout}

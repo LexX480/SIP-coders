@@ -18,7 +18,6 @@ import DropoffMaterial from "./pages/DropoffMaterial";
 import Warehouses from "./pages/Warehouses";
 import WarehouseInventory from "./pages/WarehouseInventory";
 
-
 export default function App() {
   return (
     <BrowserRouter>
@@ -56,11 +55,6 @@ export default function App() {
           <Route path="/needs/report" element={<ReportNeed />} />
           <Route path="/transparency" element={<PublicTransparency />} />
 
-          {/* WareHouse mgmt */}
-          <Route path="/dropoff" element={<DropoffMaterial />} />
-          <Route path="/coordination/warehouses" element={<Warehouses />} />
-          <Route path="/coordination/warehouses/:id" element={<WarehouseInventory />} />
-
           {/* Batch 3 - Coordination console */}
           <Route path="/coordination/login" element={<CoordinationLogin />} />
           <Route
@@ -92,6 +86,25 @@ export default function App() {
             element={
               <ProtectedRoute role="coordination">
                 <Analytics />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Batch 4 - Warehouses & drop-offs */}
+          <Route path="/dropoff" element={<DropoffMaterial />} />
+          <Route
+            path="/coordination/warehouses"
+            element={
+              <ProtectedRoute role="coordination">
+                <Warehouses />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/coordination/warehouses/:id"
+            element={
+              <ProtectedRoute role="coordination">
+                <WarehouseInventory />
               </ProtectedRoute>
             }
           />
