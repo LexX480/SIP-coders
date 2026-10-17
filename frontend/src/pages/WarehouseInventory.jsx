@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import Header from "../components/Header";
 import { RESOURCES } from "../components/ResourceGrid";
+import OpeningHoursEditor from "../components/OpeningHoursEditor";
+import { CapacityBar, HoursList, OpenBadge } from "../components/WarehouseStatus";
+import { findHoursError } from "../utils/warehouseHours";
 import {
   adjustInventory,
   cancelDropoff,
@@ -9,6 +12,7 @@ import {
   getDropoffs,
   getWarehouse,
   getWarehouseInventory,
+  updateWarehouse,
 } from "../api/client";
 
 const ICONS = Object.fromEntries(RESOURCES.map((r) => [r.value, r.icon]));
@@ -46,6 +50,12 @@ export default function WarehouseInventory() {
   const [adjNote, setAdjNote] = useState("");
   const [adjSubmitting, setAdjSubmitting] = useState(false);
   const [adjError, setAdjError] = useState("");
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [capInput, setCapInput] = useState("");
+  const [hoursDraft, setHoursDraft] = useState([]);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsError, setSettingsError] = useState("");
 
   function loadAll() {
     getWarehouse(id)
@@ -117,6 +127,37 @@ export default function WarehouseInventory() {
     }
   }
 
+  function openSettings() {
+    setCapInput(warehouse?.capacity ? String(warehouse.capacity) : "");
+    setHoursDraft(warehouse?.openingHours || []);
+    setSettingsError("");
+    setSettingsOpen(true);
+  }
+
+  async function handleSaveSettings(e) {
+    e.preventDefault();
+    setSettingsError("");
+
+    if (capInput !== "" && !(Number(capInput) >= 1)) return setSettingsError("Capacity must be 1 or more.");
+    const hoursProblem = findHoursError(hoursDraft);
+    if (hoursProblem) return setSettingsError(hoursProblem);
+
+    setSettingsSaving(true);
+    try {
+      const updated = await updateWarehouse(id, {
+        capacity: capInput === "" ? null : Number(capInput),
+        openingHours: hoursDraft,
+      });
+      setWarehouse(updated);
+      setSettingsOpen(false);
+    } catch (err) {
+      const data = err.response?.data;
+      setSettingsError(data?.message || data?.errors?.[0]?.msg || "Could not save these changes.");
+    } finally {
+      setSettingsSaving(false);
+    }
+  }
+
   const totalUnits = stock.reduce((sum, s) => sum + s.quantity, 0);
 
   return (
@@ -148,6 +189,7 @@ export default function WarehouseInventory() {
                   <h2 className="font-headline-sm text-headline-sm text-on-surface">Current stock</h2>
                   <span className="font-caption text-caption text-on-surface-variant">{totalUnits} units total</span>
                 </div>
+                {warehouse?.capacity && <CapacityBar warehouse={warehouse} className="mb-space-sm" />}
                 <div className="grid sm:grid-cols-2 gap-space-sm">
                   {stock.map((s) => (
                     <div
@@ -175,6 +217,98 @@ export default function WarehouseInventory() {
                     </p>
                   )}
                 </div>
+              </div>
+
+              {/* Capacity & opening hours */}
+              <div className="bg-surface-container-lowest rounded-xl border border-surface-container-highest shadow-sm p-space-md">
+                <div className="flex items-center justify-between mb-space-sm">
+                  <h2 className="font-headline-sm text-headline-sm text-on-surface">Capacity &amp; hours</h2>
+                  {warehouse && (
+                    <button
+                      onClick={() => (settingsOpen ? setSettingsOpen(false) : openSettings())}
+                      className="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center"
+                      title={settingsOpen ? "Close" : "Edit"}
+                    >
+                      <span className="material-symbols-outlined text-[18px]">{settingsOpen ? "close" : "edit"}</span>
+                    </button>
+                  )}
+                </div>
+
+                {!settingsOpen && warehouse && (
+                  <div className="grid sm:grid-cols-2 gap-space-md">
+                    <div>
+                      <p className="font-label-sm text-label-sm text-on-surface mb-1">Capacity</p>
+                      {warehouse.capacity ? (
+                        <>
+                          <p className="font-body-sm text-body-sm text-on-surface-variant mb-1.5">
+                            Holds up to {warehouse.capacity} units
+                          </p>
+                          <CapacityBar warehouse={warehouse} />
+                        </>
+                      ) : (
+                        <p className="font-body-sm text-body-sm text-on-surface-variant">
+                          No limit set - donors are never turned away for space.
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-space-sm mb-1">
+                        <p className="font-label-sm text-label-sm text-on-surface">Opening hours</p>
+                        <OpenBadge openingHours={warehouse.openingHours} />
+                      </div>
+                      {warehouse.openingHours?.length > 0 ? (
+                        <HoursList openingHours={warehouse.openingHours} />
+                      ) : (
+                        <p className="font-body-sm text-body-sm text-on-surface-variant">
+                          Not set - donors see no opening times.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {settingsOpen && (
+                  <form onSubmit={handleSaveSettings} className="flex flex-col gap-space-md">
+                    <div className="flex flex-col space-y-1.5 max-w-[280px]">
+                      <label className="font-label-md text-label-md text-on-surface">Capacity in units</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={capInput}
+                        onChange={(e) => setCapInput(e.target.value)}
+                        className="w-full h-11 px-3.5 bg-surface-container-lowest text-on-surface font-body-md text-body-md rounded-lg border border-surface-container-highest focus:outline-none focus:border-primary transition-colors"
+                        placeholder="No limit"
+                      />
+                      <p className="font-caption text-caption text-on-surface-variant">
+                        Leave empty for no limit. Currently holding {warehouse?.stockTotal ?? 0} units.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col space-y-1.5">
+                      <label className="font-label-md text-label-md text-on-surface">Opening hours</label>
+                      <OpeningHoursEditor value={hoursDraft} onChange={setHoursDraft} />
+                    </div>
+
+                    {settingsError && <p className="font-caption text-caption text-status-critical">{settingsError}</p>}
+
+                    <div className="flex gap-space-sm">
+                      <button
+                        type="submit"
+                        disabled={settingsSaving}
+                        className="h-11 px-space-lg rounded-lg bg-primary text-on-primary font-label-md text-label-md shadow-sm hover:opacity-95 transition-opacity disabled:opacity-60"
+                      >
+                        {settingsSaving ? "Saving..." : "Save"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSettingsOpen(false)}
+                        className="h-11 px-space-md rounded-lg bg-surface-container text-on-surface font-label-md text-label-md hover:bg-surface-container-highest transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
               </div>
 
               {/* Pending pledges */}

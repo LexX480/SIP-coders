@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Header from "../components/Header";
 import ResourceGrid from "../components/ResourceGrid";
+import { CapacityBar, HoursList, OpenBadge } from "../components/WarehouseStatus";
 import { getWarehouses, submitDropoff } from "../api/client";
 
 function wardLabel(ward) {
@@ -55,6 +56,16 @@ export default function DropoffMaterial() {
     if (!resourceType) return setError("Choose what you're bringing.");
     if (!warehouseId) return setError("Choose where you'll drop it off.");
 
+    // Quick local check so people don't wait on the server to hear there's
+    // no room - the server enforces the same limit.
+    const chosen = warehouses.find((w) => w._id === warehouseId);
+    if (chosen?.isFull) return setError("That location is full. Please choose another one.");
+    if (chosen?.capacity && Number(quantity) > chosen.spaceLeft) {
+      return setError(
+        `${chosen.name} only has room for about ${chosen.spaceLeft} more units. Bring less or choose another location.`
+      );
+    }
+
     setSubmitting(true);
     try {
       const data = await submitDropoff({
@@ -100,6 +111,12 @@ export default function DropoffMaterial() {
                     <span className="material-symbols-outlined text-[14px]">call</span>
                     {warehouse.contactPhone}
                   </p>
+                )}
+                {warehouse.openingHours?.length > 0 && (
+                  <div className="mt-space-sm pt-space-sm border-t border-surface-container-highest flex flex-col gap-space-xs">
+                    <OpenBadge openingHours={warehouse.openingHours} showDetail />
+                    <HoursList openingHours={warehouse.openingHours} />
+                  </div>
                 )}
               </div>
 
@@ -184,16 +201,35 @@ export default function DropoffMaterial() {
                     <button
                       key={w._id}
                       type="button"
+                      disabled={w.isFull}
                       onClick={() => setWarehouseId(w._id)}
-                      className={`text-left p-space-sm rounded-lg border transition-colors ${selected
-                        ? "border-secondary bg-secondary/5"
-                        : "border-surface-container-highest hover:bg-surface-container"
+                      className={`text-left p-space-sm rounded-lg border transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${selected
+                          ? "border-secondary bg-secondary/5"
+                          : `border-surface-container-highest ${w.isFull ? "" : "hover:bg-surface-container"}`
                         }`}
                     >
-                      <p className="font-label-md text-label-md text-on-surface">{w.name}</p>
+                      <div className="flex items-start justify-between gap-space-sm">
+                        <p className="font-label-md text-label-md text-on-surface">{w.name}</p>
+                        {w.isFull && (
+                          <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-status-critical/10 text-status-critical font-caption text-caption">
+                            Full
+                          </span>
+                        )}
+                      </div>
                       <p className="font-caption text-caption text-on-surface-variant">{w.address}</p>
                       {w.ward && (
                         <p className="font-caption text-caption text-on-surface-variant/70">{wardLabel(w.ward)}</p>
+                      )}
+                      {w.openingHours?.length > 0 && (
+                        <div className="mt-1.5">
+                          <OpenBadge openingHours={w.openingHours} showDetail />
+                        </div>
+                      )}
+                      {w.capacity && !w.isFull && <CapacityBar warehouse={w} className="mt-1.5" />}
+                      {selected && w.openingHours?.length > 0 && (
+                        <div className="mt-space-sm pt-space-sm border-t border-surface-container-highest">
+                          <HoursList openingHours={w.openingHours} />
+                        </div>
                       )}
                     </button>
                   );
@@ -240,7 +276,7 @@ export default function DropoffMaterial() {
               disabled={submitting}
               className="w-full h-12 rounded-lg bg-secondary text-on-secondary font-label-md text-label-md shadow-sm hover:opacity-95 transition-opacity disabled:opacity-60"
             >
-              {submitting ? "Submitting..." : "Submit Drop-Off"}
+              {submitting ? "Submitting..." : "Submit Pledge"}
             </button>
 
             <p className="text-center font-caption text-caption text-on-surface-variant">

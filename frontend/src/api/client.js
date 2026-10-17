@@ -90,6 +90,10 @@ export const getWarehouse = (id) => client.get(`/warehouses/${id}`).then((r) => 
 export const createWarehouse = (payload) =>
   client.post("/warehouses", payload).then((r) => r.data);
 
+// Update capacity (null = no limit) and/or opening hours ([] = not set).
+export const updateWarehouse = (id, payload) =>
+  client.patch(`/warehouses/${id}`, payload).then((r) => r.data);
+
 export const getWarehouseInventory = (id) =>
   client.get(`/warehouses/${id}/inventory`).then((r) => r.data);
 

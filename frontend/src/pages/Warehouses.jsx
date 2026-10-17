@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Header from "../components/Header";
 import MapPicker from "../components/MapPicker";
+import OpeningHoursEditor from "../components/OpeningHoursEditor";
+import { CapacityBar, OpenBadge } from "../components/WarehouseStatus";
+import { findHoursError } from "../utils/warehouseHours";
 import { createWarehouse, getWards, getWarehouses } from "../api/client";
 
 function wardLabel(ward) {
@@ -54,6 +57,13 @@ async function reverseGeocodeAddress(lat, lng) {
   return parts.length ? parts.join(", ") : data.display_name || null;
 }
 
+// Server validation errors come back as { errors: [{ msg }] }, other
+// failures as { message } - show whichever is there.
+function apiError(err, fallback) {
+  const data = err.response?.data;
+  return data?.message || data?.errors?.[0]?.msg || fallback;
+}
+
 export default function Warehouses() {
   const [warehouses, setWarehouses] = useState([]);
   const [wards, setWards] = useState([]);
@@ -65,6 +75,8 @@ export default function Warehouses() {
   const [address, setAddress] = useState("");
   const [location, setLocation] = useState(null);
   const [contactPhone, setContactPhone] = useState("");
+  const [capacity, setCapacity] = useState("");
+  const [openingHours, setOpeningHours] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [autoFilling, setAutoFilling] = useState(false);
@@ -92,6 +104,8 @@ export default function Warehouses() {
     setAddress("");
     setLocation(null);
     setContactPhone("");
+    setCapacity("");
+    setOpeningHours([]);
     setFormError("");
     setWardAutoFilled(false);
     setAddressAutoFilled(false);
@@ -102,10 +116,9 @@ export default function Warehouses() {
   }
 
   // Dropping or moving the pin auto-fills ward (nearest ward centroid,
-  // computed locally), address (reverse-geocoded street/landmark), and the
-  // coordinate fields below - all stay normal, editable inputs, so picking
-  // a different ward, retyping the address, or editing the coordinates
-  // afterward simply overrides the suggestion.
+  // computed locally) and address (reverse-geocoded street/landmark), but
+  // both fields stay normal, editable inputs - picking a different ward or
+  // retyping the address afterward simply overrides the suggestion.
   async function handleLocationChange(coords) {
     setLocation(coords);
     setLatInput(coords[1].toFixed(6));
@@ -156,6 +169,9 @@ export default function Warehouses() {
 
     if (!ward) return setFormError("Choose a ward.");
     if (!location) return setFormError("Pick a location on the map.");
+    if (capacity !== "" && !(Number(capacity) >= 1)) return setFormError("Capacity must be 1 or more.");
+    const hoursProblem = findHoursError(openingHours);
+    if (hoursProblem) return setFormError(hoursProblem);
 
     setSubmitting(true);
     try {
@@ -165,12 +181,14 @@ export default function Warehouses() {
         address,
         location: { coordinates: location },
         contactPhone: contactPhone || undefined,
+        capacity: capacity !== "" ? Number(capacity) : undefined,
+        openingHours: openingHours.length > 0 ? openingHours : undefined,
       });
       resetForm();
       setShowForm(false);
       loadWarehouses();
     } catch (err) {
-      setFormError(err.response?.data?.message || "Could not create this warehouse.");
+      setFormError(apiError(err, "Could not create this warehouse."));
     } finally {
       setSubmitting(false);
     }
@@ -330,14 +348,35 @@ export default function Warehouses() {
                 <MapPicker value={location} onChange={handleLocationChange} autoRequest={false} />
               </div>
 
-              <div className="flex flex-col space-y-1.5 max-w-[280px]">
-                <label className="font-label-md text-label-md text-on-surface">Contact phone (optional)</label>
-                <input
-                  value={contactPhone}
-                  onChange={(e) => setContactPhone(e.target.value)}
-                  className="w-full h-11 px-3.5 bg-surface-container-lowest text-on-surface font-body-md text-body-md rounded-lg border border-surface-container-highest focus:outline-none focus:border-primary transition-colors"
-                  placeholder="98XXXXXXXX"
-                />
+              <div className="grid sm:grid-cols-2 gap-space-sm">
+                <div className="flex flex-col space-y-1.5">
+                  <label className="font-label-md text-label-md text-on-surface">Contact phone (optional)</label>
+                  <input
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    className="w-full h-11 px-3.5 bg-surface-container-lowest text-on-surface font-body-md text-body-md rounded-lg border border-surface-container-highest focus:outline-none focus:border-primary transition-colors"
+                    placeholder="98XXXXXXXX"
+                  />
+                </div>
+                <div className="flex flex-col space-y-1.5">
+                  <label className="font-label-md text-label-md text-on-surface">Capacity in units (optional)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={capacity}
+                    onChange={(e) => setCapacity(e.target.value)}
+                    className="w-full h-11 px-3.5 bg-surface-container-lowest text-on-surface font-body-md text-body-md rounded-lg border border-surface-container-highest focus:outline-none focus:border-primary transition-colors"
+                    placeholder="e.g. 500"
+                  />
+                  <p className="font-caption text-caption text-on-surface-variant">
+                    Leave empty for no limit. Donors are turned away once it's full.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col space-y-1.5">
+                <label className="font-label-md text-label-md text-on-surface">Opening hours</label>
+                <OpeningHoursEditor value={openingHours} onChange={setOpeningHours} />
               </div>
 
               {formError && <p className="font-caption text-caption text-status-critical">{formError}</p>}
@@ -366,6 +405,12 @@ export default function Warehouses() {
                 <p className="font-caption text-caption text-on-surface-variant mt-0.5">{w.address}</p>
                 {w.ward && (
                   <p className="font-caption text-caption text-on-surface-variant/70 mt-0.5">{wardLabel(w.ward)}</p>
+                )}
+                {(w.openingHours?.length > 0 || w.capacity) && (
+                  <div className="mt-space-sm flex flex-col gap-space-xs">
+                    <OpenBadge openingHours={w.openingHours} showDetail />
+                    <CapacityBar warehouse={w} />
+                  </div>
                 )}
               </Link>
             ))}

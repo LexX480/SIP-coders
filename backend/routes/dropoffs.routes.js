@@ -4,6 +4,7 @@ const DropoffPledge = require("../models/DropoffPledge");
 const Warehouse = require("../models/Warehouse");
 const InventoryTransaction = require("../models/InventoryTransaction");
 const { requireAuth, requireRole } = require("../middleware/auth");
+const { getStockTotals, withStats } = require("../utils/warehouseStats");
 
 const router = express.Router();
 
@@ -15,6 +16,8 @@ const COORDINATOR_ROLES = ["ward_committee", "ndrrma", "cluster_lead"];
 // material to give submits this, gets back the warehouse's address so
 // they know where to physically bring it. This is a pledge only - it
 // does NOT touch inventory yet, since nothing has actually arrived.
+// If the warehouse has a capacity set, pledges that would overflow it are
+// turned away so donors aren't sent to a site with no room.
 // ---------------------------------------------------------------------
 router.post(
   "/",
@@ -34,6 +37,21 @@ router.post(
       const warehouse = await Warehouse.findById(req.body.warehouse).populate("ward", "name district locality");
       if (!warehouse) return res.status(404).json({ message: "That drop-off location could not be found" });
 
+      const totals = await getStockTotals([warehouse._id]);
+      const stockTotal = totals.get(String(warehouse._id)) || 0;
+      const stats = withStats(warehouse, stockTotal);
+
+      if (stats.isFull) {
+        return res.status(409).json({
+          message: "This drop-off location is currently full. Please choose another one.",
+        });
+      }
+      if (stats.spaceLeft !== null && Number(req.body.quantity) > stats.spaceLeft) {
+        return res.status(409).json({
+          message: `This location only has room for about ${stats.spaceLeft} more units. Please bring less or choose another location.`,
+        });
+      }
+
       const pledge = await DropoffPledge.create({
         warehouse: warehouse._id,
         resourceType: req.body.resourceType,
@@ -43,7 +61,7 @@ router.post(
         donorPhone: req.body.donorPhone,
       });
 
-      res.status(201).json({ pledge, warehouse });
+      res.status(201).json({ pledge, warehouse: stats });
     } catch (err) {
       res.status(500).json({ message: "Could not submit your drop-off", error: err.message });
     }
