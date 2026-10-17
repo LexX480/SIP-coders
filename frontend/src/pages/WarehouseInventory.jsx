@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import Header from "../components/Header";
 import { RESOURCES } from "../components/ResourceGrid";
+import DispatchPanel from "../components/DispatchPanel";
 import OpeningHoursEditor from "../components/OpeningHoursEditor";
 import { CapacityBar, HoursList, OpenBadge } from "../components/WarehouseStatus";
 import { findHoursError } from "../utils/warehouseHours";
@@ -390,97 +391,102 @@ export default function WarehouseInventory() {
               </div>
             </div>
 
-            {/* Manual adjust panel */}
-            <aside className="bg-surface-container-lowest rounded-xl border border-surface-container-highest shadow-sm p-space-md">
-              <div className="flex items-center justify-between mb-space-sm">
-                <h2 className="font-headline-sm text-headline-sm text-on-surface">Adjust stock</h2>
-                <button
-                  onClick={() => setAdjustOpen((v) => !v)}
-                  className="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center"
-                >
-                  <span className="material-symbols-outlined text-[18px]">{adjustOpen ? "close" : "edit"}</span>
-                </button>
-              </div>
+            <div className="flex flex-col gap-space-lg">
+              {/* Manual adjust panel */}
+              <aside className="bg-surface-container-lowest rounded-xl border border-surface-container-highest shadow-sm p-space-md">
+                <div className="flex items-center justify-between mb-space-sm">
+                  <h2 className="font-headline-sm text-headline-sm text-on-surface">Adjust stock</h2>
+                  <button
+                    onClick={() => setAdjustOpen((v) => !v)}
+                    className="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">{adjustOpen ? "close" : "edit"}</span>
+                  </button>
+                </div>
 
-              {!adjustOpen && (
-                <p className="font-caption text-caption text-on-surface-variant">
-                  Manually add or remove stock, e.g. a physical recount or distributed items.
-                </p>
-              )}
+                {!adjustOpen && (
+                  <p className="font-caption text-caption text-on-surface-variant">
+                    Manually add or remove stock, e.g. a physical recount or distributed items.
+                  </p>
+                )}
 
-              {adjustOpen && (
-                <form onSubmit={handleAdjust} className="flex flex-col gap-space-sm">
-                  <div className="flex flex-col space-y-1.5">
-                    <label className="font-label-sm text-label-sm text-on-surface">Resource</label>
-                    <select
-                      value={adjResourceType}
-                      onChange={(e) => setAdjResourceType(e.target.value)}
-                      className="w-full h-10 px-3 bg-surface-container-lowest text-on-surface font-body-sm text-body-sm rounded-lg border border-surface-container-highest focus:outline-none focus:border-primary transition-colors cursor-pointer"
-                    >
-                      {RESOURCES.map((r) => (
-                        <option key={r.value} value={r.value}>
-                          {r.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                {adjustOpen && (
+                  <form onSubmit={handleAdjust} className="flex flex-col gap-space-sm">
+                    <div className="flex flex-col space-y-1.5">
+                      <label className="font-label-sm text-label-sm text-on-surface">Resource</label>
+                      <select
+                        value={adjResourceType}
+                        onChange={(e) => setAdjResourceType(e.target.value)}
+                        className="w-full h-10 px-3 bg-surface-container-lowest text-on-surface font-body-sm text-body-sm rounded-lg border border-surface-container-highest focus:outline-none focus:border-primary transition-colors cursor-pointer"
+                      >
+                        {RESOURCES.map((r) => (
+                          <option key={r.value} value={r.value}>
+                            {r.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                  <div className="flex flex-col space-y-1.5">
-                    <label className="font-label-sm text-label-sm text-on-surface">Sub-category (optional)</label>
-                    <input
-                      value={adjSubCategory}
-                      onChange={(e) => setAdjSubCategory(e.target.value)}
-                      className="w-full h-10 px-3 bg-surface-container-lowest text-on-surface font-body-sm text-body-sm rounded-lg border border-surface-container-highest focus:outline-none focus:border-primary transition-colors"
-                    />
-                  </div>
-
-                  <div className="flex gap-space-sm">
-                    <div className="flex-1 flex flex-col space-y-1.5">
-                      <label className="font-label-sm text-label-sm text-on-surface">Amount</label>
+                    <div className="flex flex-col space-y-1.5">
+                      <label className="font-label-sm text-label-sm text-on-surface">Sub-category (optional)</label>
                       <input
-                        type="number"
-                        min="0.01"
-                        step="any"
-                        value={adjQuantity}
-                        onChange={(e) => setAdjQuantity(e.target.value)}
+                        value={adjSubCategory}
+                        onChange={(e) => setAdjSubCategory(e.target.value)}
                         className="w-full h-10 px-3 bg-surface-container-lowest text-on-surface font-body-sm text-body-sm rounded-lg border border-surface-container-highest focus:outline-none focus:border-primary transition-colors"
                       />
                     </div>
-                    <div className="flex-1 flex flex-col space-y-1.5">
-                      <label className="font-label-sm text-label-sm text-on-surface">Direction</label>
-                      <select
-                        value={adjDirection}
-                        onChange={(e) => setAdjDirection(e.target.value)}
-                        className="w-full h-10 px-3 bg-surface-container-lowest text-on-surface font-body-sm text-body-sm rounded-lg border border-surface-container-highest focus:outline-none focus:border-primary transition-colors cursor-pointer"
-                      >
-                        <option value="add">Add</option>
-                        <option value="remove">Remove</option>
-                      </select>
+
+                    <div className="flex gap-space-sm">
+                      <div className="flex-1 flex flex-col space-y-1.5">
+                        <label className="font-label-sm text-label-sm text-on-surface">Amount</label>
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="any"
+                          value={adjQuantity}
+                          onChange={(e) => setAdjQuantity(e.target.value)}
+                          className="w-full h-10 px-3 bg-surface-container-lowest text-on-surface font-body-sm text-body-sm rounded-lg border border-surface-container-highest focus:outline-none focus:border-primary transition-colors"
+                        />
+                      </div>
+                      <div className="flex-1 flex flex-col space-y-1.5">
+                        <label className="font-label-sm text-label-sm text-on-surface">Direction</label>
+                        <select
+                          value={adjDirection}
+                          onChange={(e) => setAdjDirection(e.target.value)}
+                          className="w-full h-10 px-3 bg-surface-container-lowest text-on-surface font-body-sm text-body-sm rounded-lg border border-surface-container-highest focus:outline-none focus:border-primary transition-colors cursor-pointer"
+                        >
+                          <option value="add">Add</option>
+                          <option value="remove">Remove</option>
+                        </select>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex flex-col space-y-1.5">
-                    <label className="font-label-sm text-label-sm text-on-surface">Note (optional)</label>
-                    <input
-                      value={adjNote}
-                      onChange={(e) => setAdjNote(e.target.value)}
-                      className="w-full h-10 px-3 bg-surface-container-lowest text-on-surface font-body-sm text-body-sm rounded-lg border border-surface-container-highest focus:outline-none focus:border-primary transition-colors"
-                      placeholder="e.g. physical recount"
-                    />
-                  </div>
+                    <div className="flex flex-col space-y-1.5">
+                      <label className="font-label-sm text-label-sm text-on-surface">Note (optional)</label>
+                      <input
+                        value={adjNote}
+                        onChange={(e) => setAdjNote(e.target.value)}
+                        className="w-full h-10 px-3 bg-surface-container-lowest text-on-surface font-body-sm text-body-sm rounded-lg border border-surface-container-highest focus:outline-none focus:border-primary transition-colors"
+                        placeholder="e.g. physical recount"
+                      />
+                    </div>
 
-                  {adjError && <p className="font-caption text-caption text-status-critical">{adjError}</p>}
+                    {adjError && <p className="font-caption text-caption text-status-critical">{adjError}</p>}
 
-                  <button
-                    type="submit"
-                    disabled={adjSubmitting}
-                    className="h-10 rounded-lg bg-primary text-on-primary font-label-md text-label-md disabled:opacity-60"
-                  >
-                    {adjSubmitting ? "Saving..." : "Save Adjustment"}
-                  </button>
-                </form>
-              )}
-            </aside>
+                    <button
+                      type="submit"
+                      disabled={adjSubmitting}
+                      className="h-10 rounded-lg bg-primary text-on-primary font-label-md text-label-md disabled:opacity-60"
+                    >
+                      {adjSubmitting ? "Saving..." : "Save Adjustment"}
+                    </button>
+                  </form>
+                )}
+              </aside>
+
+              {/* Send stock from this warehouse to an open need */}
+              <DispatchPanel warehouseId={id} refreshKey={transactions[0]?._id} onChanged={loadAll} />
+            </div>
           </div>
         </div>
       </main>

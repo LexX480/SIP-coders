@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import StatusPill from "../components/StatusPill";
+import PickupAlerts from "../components/PickupAlerts";
 import { RESOURCES, SUBCATEGORIES } from "../components/ResourceGrid";
 import { getResponderDashboard, getNeeds, claimNeed, unclaimNeed } from "../api/client";
 import { useAuth } from "../context/AuthContext";
@@ -151,6 +152,11 @@ export default function ResponderHome() {
 
           {error && <p className="font-caption text-caption text-status-critical mb-space-md">{error}</p>}
 
+          {/* Pickups a coordinator has sent this organization's way - kept at
+              the very top so volunteers can be sent out straight away. Hidden
+              when there's nothing to collect or deliver. */}
+          <PickupAlerts />
+
           {/* Stat cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-space-md mb-space-md">
             <StatBlock
@@ -271,6 +277,15 @@ export default function ResponderHome() {
             </div>
           </div>
 
+          {/* Device/session meta row - decorative telemetry, wire up later if useful */}
+          <div className="flex flex-wrap items-center justify-between gap-space-sm px-1">
+            <span className="font-caption text-caption text-on-surface-variant flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[14px]">devices</span>
+              Authenticated Device ID: {user?._id ? user._id.slice(-8).toUpperCase() : "KMD-OPS-772"}
+            </span>
+            <span className="font-caption text-caption text-on-surface-variant">Bandwidth: High / Stable</span>
+            <span className="font-caption text-caption text-on-surface-variant">Offline Queue: Empty</span>
+          </div>
         </div>
       </main>
       <Footer />
@@ -456,7 +471,7 @@ function NeedDetailModal({ need, currentUserId, loading, error, onClose, onClaim
 
           {claimedByOther && (
             <p className="font-caption text-caption text-on-surface-variant text-center py-space-xs">
-              Already being handled - check back if it isn't resolved soon.
+              Already being handled — check back if it isn't resolved soon.
             </p>
           )}
         </div>

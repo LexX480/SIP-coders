@@ -24,12 +24,15 @@ const inventoryTransactionSchema = new mongoose.Schema(
 
     reason: {
       type: String,
-      enum: ["dropoff_confirmed", "manual_add", "manual_remove", "distributed_out"],
+      enum: ["dropoff_confirmed", "manual_add", "manual_remove", "distributed_out", "dispatch_cancelled"],
       required: true,
     },
     note: { type: String, trim: true, maxlength: 200 },
 
     relatedPledge: { type: mongoose.Schema.Types.ObjectId, ref: "DropoffPledge" },
+    // Set on "distributed_out" and "dispatch_cancelled" entries so a stock
+    // movement can be traced back to the dispatch that caused it.
+    relatedDispatch: { type: mongoose.Schema.Types.ObjectId, ref: "Dispatch" },
     performedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -40,5 +43,6 @@ const inventoryTransactionSchema = new mongoose.Schema(
 );
 
 inventoryTransactionSchema.index({ warehouse: 1, resourceType: 1, subCategory: 1 });
+inventoryTransactionSchema.index({ relatedDispatch: 1 });
 
 module.exports = mongoose.model("InventoryTransaction", inventoryTransactionSchema);

@@ -13,6 +13,7 @@ const analyticsRoutes = require("./routes/analytics.routes");
 const dashboardRoutes = require("./routes/dashboard.routes");
 const warehousesRoutes = require("./routes/warehouses.routes");
 const dropoffsRoutes = require("./routes/dropoffs.routes");
+const dispatchesRoutes = require("./routes/dispatches.routes");
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/warehouses", warehousesRoutes);
 app.use("/api/dropoffs", dropoffsRoutes);
+app.use("/api/dispatches", dispatchesRoutes);
 
 // 404 fallback
 app.use((req, res) => res.status(404).json({ message: "Route not found" }));

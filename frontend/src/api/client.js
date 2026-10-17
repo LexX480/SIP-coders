@@ -78,6 +78,29 @@ export const getResponderDashboard = () =>
 export const getCoordinationDashboard = () =>
   client.get("/dashboard/coordination").then((r) => r.data);
 
+// --- Dispatches (warehouse stock -> a reported need) -------------------------
+// Coordinator side
+export const getDispatchCandidates = (warehouseId) =>
+  client.get(`/dispatches/candidates/${warehouseId}`).then((r) => r.data);
+
+export const createDispatch = (payload) =>
+  client.post("/dispatches", payload).then((r) => r.data);
+
+export const getDispatches = (filters = {}) =>
+  client.get("/dispatches", { params: filters }).then((r) => r.data);
+
+export const cancelDispatch = (id) =>
+  client.patch(`/dispatches/${id}/cancel`).then((r) => r.data);
+
+// Responder side
+export const getMyDispatches = () => client.get("/dispatches/mine").then((r) => r.data);
+
+export const markDispatchPickedUp = (id) =>
+  client.patch(`/dispatches/${id}/pickup`).then((r) => r.data);
+
+export const markDispatchDelivered = (id) =>
+  client.patch(`/dispatches/${id}/deliver`).then((r) => r.data);
+
 export default client;
 
 
