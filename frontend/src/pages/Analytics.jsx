@@ -4,6 +4,7 @@ import {
   Area,
   BarChart,
   Bar,
+  Legend,
   Cell,
   XAxis,
   YAxis,
@@ -13,7 +14,7 @@ import {
 } from "recharts";
 import Header from "../components/Header";
 import { RESOURCES } from "../components/ResourceGrid";
-import { getByCategory, getVolumeOverTime } from "../api/client";
+import { getByCategory, getLogisticsAnalytics, getVolumeOverTime } from "../api/client";
 
 const ICONS = Object.fromEntries(RESOURCES.map((r) => [r.value, r.icon]));
 
@@ -64,11 +65,271 @@ function SummaryStat({ icon, label, value, sub, accent, pulse }) {
   );
 }
 
+
+// "95" -> "95 min", "135" -> "2h 15m", null -> "—"
+function formatMins(mins) {
+  if (mins === null || mins === undefined) return "—";
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h >= 24) return `${Math.round(h / 24)}d`;
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+
+const STATUS_STEPS = [
+  { key: "pending_pickup", label: "Waiting for pickup", color: "#E0A458" },
+  { key: "picked_up", label: "On the way", color: "#2E86AB" },
+  { key: "delivered", label: "Delivered", color: "#2A9D8F" },
+  { key: "cancelled", label: "Cancelled", color: "#9CA3AF" },
+];
+
+function Card({ title, children, className = "" }) {
+  return (
+    <div className={`bg-surface-container-lowest rounded-xl border border-surface-container-highest shadow-sm p-space-md ${className}`}>
+      <h2 className="font-headline-sm text-headline-sm text-on-surface mb-space-sm">{title}</h2>
+      {children}
+    </div>
+  );
+}
+
+function FlowTooltip({ active, payload, label }) {
+  if (!active || !payload || !payload.length) return null;
+  return (
+    <div className="bg-surface-container-lowest border border-surface-container-highest rounded-lg shadow-lg px-3 py-2">
+      <p className="font-caption text-caption text-on-surface-variant mb-0.5">{label}</p>
+      {payload.map((p) => (
+        <p key={p.dataKey} className="font-label-md text-label-md text-on-surface">
+          {p.name}: {p.value} units
+        </p>
+      ))}
+    </div>
+  );
+}
+
+// Warehouses & dispatches section, shown below the distribution analytics.
+function LogisticsSection({ data, error }) {
+  if (error) {
+    return (
+      <p className="font-caption text-caption text-status-critical mt-space-lg bg-status-critical/10 border border-status-critical/30 rounded-lg px-3 py-2">
+        {error}
+      </p>
+    );
+  }
+  if (!data) return null;
+
+  const { summary: s, dispatchStatus, flow, warehouses, stockByCategory, responders } = data;
+  const totalDispatches = Object.values(dispatchStatus).reduce((a, b) => a + b, 0);
+  const noActivity = flow.every((d) => d.received === 0 && d.sentOut === 0);
+  const deliveredPct = s.unitsDispatched > 0 ? Math.round((s.unitsDelivered / s.unitsDispatched) * 100) : null;
+  const stockTotal = stockByCategory.reduce((sum, c) => sum + c.quantity, 0);
+
+  return (
+    <section className="mt-space-xl" aria-label="Warehouses and dispatches">
+      <div className="mb-space-md">
+        <h2 className="font-headline-md text-headline-md text-on-surface tracking-tight">Warehouses &amp; dispatches</h2>
+        <p className="font-caption text-caption text-on-surface-variant">
+          What's sitting in storage, and how quickly it's getting out to communities
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-space-md mb-space-md">
+        <SummaryStat
+          icon="warehouse"
+          label="Stock on hand"
+          value={s.totalStock}
+          sub={`across ${s.warehouseCount} warehouse${s.warehouseCount === 1 ? "" : "s"}`}
+          accent="primary"
+        />
+        <SummaryStat
+          icon="inventory"
+          label="Warehouse space used"
+          value={s.utilisationPct !== null ? `${s.utilisationPct}%` : "—"}
+          sub={s.totalCapacity ? `of ${s.totalCapacity} units capacity` : "no capacity set yet"}
+          accent="status-pending"
+        />
+        <SummaryStat
+          icon="local_shipping"
+          label="Units dispatched"
+          value={s.unitsDispatched}
+          sub={`${s.dispatchCount} dispatch${s.dispatchCount === 1 ? "" : "es"} • ${s.needsServed} need${s.needsServed === 1 ? "" : "s"} served`}
+          accent="secondary"
+          pulse={s.inTransit > 0}
+        />
+        <SummaryStat
+          icon="task_alt"
+          label="Delivered"
+          value={deliveredPct !== null ? `${deliveredPct}%` : "—"}
+          sub={s.inTransit > 0 ? `${s.inTransit} still in transit` : `${s.unitsDelivered} units arrived`}
+          accent="status-confirmed"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-space-md mb-space-md">
+        <Card title="Stock in vs. sent out" className="lg:col-span-2 h-[340px] flex flex-col">
+          {noActivity ? (
+            <p className="font-body-sm text-body-sm text-on-surface-variant">
+              No stock has moved in the last 14 days.
+            </p>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={flow} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E3DE" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={{ stroke: "#E5E3DE" }}
+                  tickFormatter={(d) => d.slice(5)}
+                  interval="preserveStartEnd"
+                />
+                <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
+                <Tooltip content={<FlowTooltip />} cursor={{ fill: "rgba(0,0,0,0.03)" }} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="received" name="Received" fill="#2A9D8F" radius={[4, 4, 0, 0]} animationDuration={900} />
+                <Bar dataKey="sentOut" name="Sent out" fill="#1B2A4A" radius={[4, 4, 0, 0]} animationDuration={900} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </Card>
+
+        <Card title="Dispatch pipeline">
+          {totalDispatches === 0 ? (
+            <p className="font-body-sm text-body-sm text-on-surface-variant">No dispatches yet.</p>
+          ) : (
+            <>
+              <div className="flex h-3 rounded-full overflow-hidden bg-surface-container-highest mb-space-sm">
+                {STATUS_STEPS.map((st) =>
+                  dispatchStatus[st.key] ? (
+                    <div
+                      key={st.key}
+                      title={`${st.label}: ${dispatchStatus[st.key]}`}
+                      style={{ width: `${(dispatchStatus[st.key] / totalDispatches) * 100}%`, backgroundColor: st.color }}
+                    />
+                  ) : null
+                )}
+              </div>
+              <div className="flex flex-col gap-1.5 mb-space-md">
+                {STATUS_STEPS.map((st) => (
+                  <div key={st.key} className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 font-body-sm text-body-sm text-on-surface">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: st.color }} />
+                      {st.label}
+                    </span>
+                    <span className="font-label-md text-label-md text-on-surface tabular-nums">
+                      {dispatchStatus[st.key] || 0}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="pt-space-sm border-t border-surface-container-highest flex flex-col gap-1.5">
+                {[
+                  ["Dispatch to pickup", s.avgPickupMins],
+                  ["Pickup to delivery", s.avgDeliveryMins],
+                  ["Dispatch to delivered", s.avgTotalMins],
+                ].map(([label, mins]) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <span className="font-caption text-caption text-on-surface-variant">Avg. {label.toLowerCase()}</span>
+                    <span className="font-label-md text-label-md text-on-surface tabular-nums">{formatMins(mins)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-space-md">
+        <Card title="Stock by warehouse" className="lg:col-span-2">
+          <div className="flex flex-col gap-space-md">
+            {warehouses.map((w) => (
+              <div key={w._id}>
+                <div className="flex items-center justify-between mb-1 gap-space-sm">
+                  <span className="font-label-md text-label-md text-on-surface truncate">{w.name}</span>
+                  <span className="font-caption text-caption text-on-surface-variant shrink-0">
+                    {w.stock}
+                    {w.capacity ? ` / ${w.capacity} units` : " units"}
+                    {w.percentFull !== null ? ` • ${w.percentFull}%` : ""}
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-surface-container-highest overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-700 ease-out"
+                    style={{
+                      width: `${w.percentFull ?? (s.totalStock > 0 ? Math.round((w.stock / s.totalStock) * 100) : 0)}%`,
+                      backgroundColor: w.percentFull >= 90 ? "#D7263D" : w.percentFull >= 70 ? "#E0A458" : "#1B2A4A",
+                    }}
+                  />
+                </div>
+                <p className="font-caption text-caption text-on-surface-variant/70 mt-0.5">
+                  {w.unitsDispatched > 0
+                    ? `${w.unitsDispatched} units sent out in ${w.dispatchCount} dispatch${w.dispatchCount === 1 ? "" : "es"}`
+                    : "Nothing dispatched yet"}
+                </p>
+              </div>
+            ))}
+            {warehouses.length === 0 && (
+              <p className="font-body-sm text-body-sm text-on-surface-variant">No warehouses yet.</p>
+            )}
+          </div>
+
+          {stockByCategory.length > 0 && (
+            <div className="mt-space-md pt-space-md border-t border-surface-container-highest">
+              <p className="font-label-md text-label-md text-on-surface mb-space-xs">What's in storage</p>
+              <div className="flex h-3 rounded-full overflow-hidden bg-surface-container-highest mb-space-xs">
+                {stockByCategory.map((c) => (
+                  <div
+                    key={c.resourceType}
+                    title={`${c.resourceType}: ${c.quantity}`}
+                    style={{ width: `${(c.quantity / stockTotal) * 100}%`, backgroundColor: CATEGORY_COLORS[c.resourceType] || "#D7263D" }}
+                  />
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-x-space-md gap-y-1">
+                {stockByCategory.map((c) => (
+                  <span key={c.resourceType} className="flex items-center gap-1.5 font-caption text-caption text-on-surface-variant">
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[c.resourceType] || "#D7263D" }} />
+                    <span className="capitalize">{c.resourceType}</span> {c.quantity}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </Card>
+
+        <Card title="Top responding organizations">
+          <div className="flex flex-col divide-y divide-surface-container-highest">
+            {responders.map((r, i) => (
+              <div key={r.organizationName} className="py-space-sm first:pt-0 flex items-center gap-space-sm">
+                <span className="w-6 h-6 rounded-full bg-surface-container text-on-surface-variant flex items-center justify-center font-label-sm text-label-sm shrink-0">
+                  {i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-label-md text-label-md text-on-surface truncate">{r.organizationName}</p>
+                  <p className="font-caption text-caption text-on-surface-variant">
+                    {r.units} units • {r.delivered}/{r.dispatches} delivered
+                  </p>
+                </div>
+              </div>
+            ))}
+            {responders.length === 0 && (
+              <p className="font-body-sm text-body-sm text-on-surface-variant">
+                No dispatches have been assigned to organizations yet.
+              </p>
+            )}
+          </div>
+        </Card>
+      </div>
+    </section>
+  );
+}
+
 export default function Analytics() {
   const [volume, setVolume] = useState([]);
   const [byCategory, setByCategory] = useState([]);
   const [error, setError] = useState("");
   const [loaded, setLoaded] = useState(false);
+  const [logistics, setLogistics] = useState(null);
+  const [logisticsError, setLogisticsError] = useState("");
 
   useEffect(() => {
     Promise.all([
@@ -77,6 +338,11 @@ export default function Analytics() {
     ])
       .catch(() => setError("Could not load analytics."))
       .finally(() => setLoaded(true));
+
+    // Loaded separately so a problem here never blanks the charts above.
+    getLogisticsAnalytics()
+      .then(setLogistics)
+      .catch(() => setLogisticsError("Could not load warehouse and dispatch analytics."));
   }, []);
 
   const insights = useMemo(() => {
@@ -178,7 +444,6 @@ export default function Analytics() {
                 )}
               </div>
               <ResponsiveContainer width="100%" height="100%">
-
                 <AreaChart data={volume} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E3DE" vertical={false} />
                   <XAxis
@@ -284,6 +549,8 @@ export default function Analytics() {
               )}
             </div>
           </div>
+
+          <LogisticsSection data={logistics} error={logisticsError} />
         </div>
       </main>
 

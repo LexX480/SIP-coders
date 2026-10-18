@@ -71,6 +71,10 @@ export const getVolumeOverTime = () =>
 export const getByCategory = () =>
   client.get("/analytics/by-category").then((r) => r.data);
 
+// Warehouse stock + dispatch performance (coordinator roles only)
+export const getLogisticsAnalytics = () =>
+  client.get("/analytics/logistics").then((r) => r.data);
+
 // --- Dashboards ---------------------------------------------------------
 export const getResponderDashboard = () =>
   client.get("/dashboard/responder").then((r) => r.data);

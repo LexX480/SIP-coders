@@ -71,7 +71,7 @@ export default function EmergencyContacts() {
           <div className="p-space-sm border-b border-surface-container-highest">
             <p className="font-label-md text-label-md text-on-surface flex items-center gap-1.5">
               <span className="material-symbols-outlined text-[16px] text-status-critical">emergency</span>
-              Emergency Contacts — Nepal
+              Emergency Contacts - Nepal
             </p>
             <p className="font-caption text-caption text-on-surface-variant mt-0.5">
               National toll-free numbers, reachable nationwide, 24/7.
@@ -116,7 +116,7 @@ export default function EmergencyContacts() {
           <div className="p-space-sm border-t border-surface-container-highest">
             <p className="font-caption text-caption text-on-surface-variant">
               Sourced from Nepal Police and National Emergency Operation Centre public registers. Local ward numbers
-              vary — confirm with your ward office where possible.
+              vary - confirm with your ward office where possible.
             </p>
           </div>
         </div>
