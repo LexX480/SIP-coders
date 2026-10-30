@@ -73,7 +73,7 @@ export default function DuplicationAlerts() {
       <Header variant="coordination" />
       <main className="w-full pt-16 flex-1">
         {/* Hero band */}
-        <div className="bg-primary">
+        <div className="bg-[#184681]">
           <div className="max-w-[1100px] mx-auto px-margin-mobile lg:px-margin py-space-lg flex items-center gap-space-md">
             <div className="w-14 h-14 rounded-xl bg-on-primary/10 flex items-center justify-center shrink-0">
               <span className="material-symbols-outlined text-on-primary text-[28px]">warning</span>
@@ -108,7 +108,7 @@ export default function DuplicationAlerts() {
                 key={f.value}
                 onClick={() => setFilter(f.value)}
                 className={`px-3.5 py-1.5 rounded-full font-label-md text-label-md transition-colors ${filter === f.value
-                  ? "bg-primary text-on-primary"
+                  ? "bg-[#184681] text-on-primary"
                   : "bg-surface-container text-on-surface-variant hover:bg-surface-container-highest"
                   }`}
               >

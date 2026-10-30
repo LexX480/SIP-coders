@@ -68,7 +68,7 @@ export default function Header({ variant = "responder" }) {
                 to={link.path}
                 className={
                   location.pathname === link.path
-                    ? "whitespace-nowrap transition-colors bg-primary-container text-on-primary font-label-sm text-label-sm rounded-lg px-2.5 py-1.5"
+                    ? "whitespace-nowrap transition-colors bg-[#184681] text-on-primary font-label-sm text-label-sm rounded-lg px-2.5 py-1.5"
                     : "whitespace-nowrap font-label-sm text-label-sm text-on-surface-variant hover:text-on-surface px-2.5 py-1.5 rounded-lg hover:bg-surface-container transition-colors"
                 }
               >
@@ -88,7 +88,7 @@ export default function Header({ variant = "responder" }) {
             <EmergencyContacts />
             <button
               onClick={logout}
-              className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"
+              className="w-8 h-8 rounded-full bg-[#184681] flex items-center justify-center shrink-0"
               title="Log out"
             >
               <span className="material-symbols-outlined text-on-primary text-[18px]">logout</span>

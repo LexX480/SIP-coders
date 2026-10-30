@@ -198,7 +198,7 @@ export default function Warehouses() {
     <div className="min-h-screen flex flex-col bg-surface">
       <Header variant="coordination" />
       <main className="w-full pt-16 flex-1">
-        <div className="bg-primary">
+        <div className="bg-[#184681]">
           <div className="max-w-[1120px] mx-auto px-margin-mobile lg:px-margin py-space-lg flex items-center justify-between gap-space-md flex-wrap">
             <div>
               <h1 className="font-headline-lg text-headline-lg text-on-primary tracking-tight">Warehouses</h1>

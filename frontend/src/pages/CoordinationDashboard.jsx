@@ -379,7 +379,7 @@ export default function CoordinationDashboard() {
       <Header variant="coordination" />
       <main className="w-full pt-16 flex-1">
         {/* Hero band */}
-        <div className="bg-primary">
+        <div className="bg-[#184681]">
           <div className="max-w-[1120px] mx-auto px-margin-mobile lg:px-margin py-space-lg">
             <div className="flex flex-wrap items-center justify-between gap-space-sm">
               <div>

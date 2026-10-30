@@ -375,7 +375,7 @@ export default function Analytics() {
       <Header variant="coordination" />
       <main className="w-full pt-16 flex-1">
         {/* Hero band */}
-        <div className="bg-primary">
+        <div className="bg-[#184681]">
           <div className="max-w-[1120px] mx-auto px-margin-mobile lg:px-margin py-space-lg">
             <h1 className="font-headline-lg text-headline-lg text-white tracking-tight">Analytics</h1>
             <p className="font-caption text-caption text-white/70 mt-1">
