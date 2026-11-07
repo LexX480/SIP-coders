@@ -125,7 +125,7 @@ export default function ResponderHome() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col bg-background overflow-x-hidden">
       <Header variant="responder" />
       <main className="w-full pt-16 flex-1">
         <div className="max-w-[1120px] mx-auto px-gutter py-space-lg">
@@ -189,7 +189,7 @@ export default function ResponderHome() {
           </div>
 
           {/* Wide dispatch CTA card */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-space-md p-space-lg rounded-xl bg-surface-container-lowest border border-surface-container-highest shadow-sm mb-space-md">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-space-md p-space-md sm:p-space-lg rounded-xl bg-surface-container-lowest border border-surface-container-highest shadow-sm mb-space-md">
             <div>
               <p className="font-label-sm text-label-sm text-secondary uppercase tracking-wider mb-1">
                 Relief Dispatch Protocol
@@ -202,7 +202,7 @@ export default function ResponderHome() {
             </div>
             <Link
               to="/responder/log"
-              className="shrink-0 h-11 px-6 rounded-lg bg-secondary text-on-secondary font-label-md text-label-md flex items-center justify-center gap-2 shadow-sm hover:opacity-95 transition-opacity"
+              className="shrink-0 h-11 px-6 w-full md:w-auto rounded-lg bg-secondary text-on-secondary font-label-md text-label-md flex items-center justify-center gap-2 shadow-sm hover:opacity-95 transition-opacity"
             >
               <span className="material-symbols-outlined text-[18px]">add</span>
               <span>Log a Distribution</span>
@@ -232,14 +232,14 @@ export default function ResponderHome() {
                     key={n._id}
                     type="button"
                     onClick={() => openNeed(n)}
-                    className={`w-full flex items-center gap-space-sm p-space-sm rounded-lg hover:bg-surface-container-low text-left transition-colors ${solved ? "opacity-60" : ""
+                    className={`w-full flex flex-wrap sm:flex-nowrap items-start sm:items-center gap-x-space-sm gap-y-space-xs p-space-sm rounded-lg hover:bg-surface-container-low text-left transition-colors ${solved ? "opacity-60" : ""
                       } ${assignedToMe && !solved ? "ring-1 ring-secondary/40 bg-secondary/5" : ""}`}
                   >
-                    <div className="w-9 h-9 rounded-lg bg-surface-container flex items-center justify-center text-primary shrink-0">
+                    <div className="order-1 w-9 h-9 rounded-lg bg-surface-container flex items-center justify-center text-primary shrink-0">
                       <span className="material-symbols-outlined text-[18px]">{ICONS[n.resourceType] || "inventory_2"}</span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-label-md text-label-md text-on-surface truncate">
+                    <div className="order-2 flex-1 min-w-0">
+                      <p className="font-label-md text-label-md text-on-surface sm:truncate break-words">
                         {LABELS[n.resourceType] || n.resourceType} - {wardLabel(n.ward)}
                       </p>
                       <p className="font-caption text-caption text-on-surface-variant">
@@ -251,21 +251,27 @@ export default function ResponderHome() {
                         )}
                       </p>
                     </div>
-                    {assignedToMe && !solved && (
-                      <span className="flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-label-sm bg-secondary/10 text-secondary shrink-0">
-                        <span className="material-symbols-outlined text-[14px]">call_split</span>
-                        Assigned to you
+                    {/* Badges: their own line under the text on phones (indented
+                        past the icon), inline on the right from sm up. */}
+                    <div className="order-4 sm:order-3 w-full sm:w-auto pl-[3.25rem] sm:pl-0 flex flex-wrap items-center gap-space-xs sm:shrink-0">
+                      {assignedToMe && !solved && (
+                        <span className="flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-label-sm bg-secondary/10 text-secondary shrink-0">
+                          <span className="material-symbols-outlined text-[14px]">call_split</span>
+                          Assigned to you
+                        </span>
+                      )}
+                      <span
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-label-sm shrink-0 ${solved ? "bg-status-confirmed/10 text-status-confirmed" : "bg-status-pending/10 text-status-pending"
+                          }`}
+                      >
+                        <span className="material-symbols-outlined text-[14px]">{solved ? "task_alt" : "pending"}</span>
+                        {solved ? "Solved" : "Unsolved"}
                       </span>
-                    )}
-                    <span
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-label-sm shrink-0 ${solved ? "bg-status-confirmed/10 text-status-confirmed" : "bg-status-pending/10 text-status-pending"
-                        }`}
-                    >
-                      <span className="material-symbols-outlined text-[14px]">{solved ? "task_alt" : "pending"}</span>
-                      {solved ? "Solved" : "Unsolved"}
+                      <StatusPill status={n.urgency} />
+                    </div>
+                    <span className="order-3 sm:order-4 material-symbols-outlined text-[18px] text-on-surface-variant shrink-0 self-center">
+                      chevron_right
                     </span>
-                    <StatusPill status={n.urgency} />
-                    <span className="material-symbols-outlined text-[18px] text-on-surface-variant">chevron_right</span>
                   </button>
                 );
               })}
@@ -355,7 +361,7 @@ function NeedDetailModal({ need, currentUserId, loading, error, onClose, onClaim
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-surface-container-lowest rounded-2xl shadow-lg border border-surface-container-highest overflow-hidden"
+        className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface-container-lowest rounded-2xl shadow-lg border border-surface-container-highest"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-space-md border-b border-surface-container-highest">

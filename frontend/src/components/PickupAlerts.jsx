@@ -58,7 +58,7 @@ function ActionLink({ href, icon, children }) {
       href={href}
       target={href.startsWith("http") ? "_blank" : undefined}
       rel="noreferrer"
-      className="h-10 px-3 rounded-lg border border-surface-container-highest text-on-surface font-label-md text-label-md flex items-center justify-center gap-1.5 hover:bg-surface-container-low transition-colors"
+      className="h-10 px-3 flex-1 sm:flex-none rounded-lg border border-surface-container-highest text-on-surface font-label-md text-label-md flex items-center justify-center gap-1.5 hover:bg-surface-container-low transition-colors"
     >
       <span className="material-symbols-outlined text-[18px]">{icon}</span>
       {children}
@@ -168,7 +168,7 @@ export default function PickupAlerts() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-space-xs shrink-0">
+                <div className="flex flex-wrap items-center gap-space-xs">
                   <StatusPill status={d.need?.urgency} />
                   <Step number={1} label="Pick up" state={pickedUp ? "done" : "current"} />
                   <Step number={2} label="Deliver" state={pickedUp ? "current" : "todo"} />
@@ -231,7 +231,7 @@ export default function PickupAlerts() {
                       type="button"
                       disabled={busyId === d._id}
                       onClick={() => advance(d, markDispatchPickedUp)}
-                      className="h-10 px-4 rounded-lg bg-secondary text-on-secondary font-label-md text-label-md shadow-sm hover:opacity-95 transition-opacity disabled:opacity-60 sm:ml-auto"
+                      className="h-10 px-4 w-full sm:w-auto rounded-lg bg-secondary text-on-secondary font-label-md text-label-md shadow-sm hover:opacity-95 transition-opacity disabled:opacity-60 sm:ml-auto"
                     >
                       {busyId === d._id ? "Saving..." : "We've picked it up"}
                     </button>
@@ -248,7 +248,7 @@ export default function PickupAlerts() {
                       type="button"
                       disabled={busyId === d._id}
                       onClick={() => advance(d, markDispatchDelivered)}
-                      className="h-10 px-4 rounded-lg bg-status-confirmed text-white font-label-md text-label-md shadow-sm hover:opacity-95 transition-opacity disabled:opacity-60 sm:ml-auto"
+                      className="h-10 px-4 w-full sm:w-auto rounded-lg bg-status-confirmed text-white font-label-md text-label-md shadow-sm hover:opacity-95 transition-opacity disabled:opacity-60 sm:ml-auto"
                     >
                       {busyId === d._id ? "Saving..." : "Mark delivered"}
                     </button>

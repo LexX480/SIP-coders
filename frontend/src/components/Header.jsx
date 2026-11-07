@@ -27,13 +27,57 @@ const COORDINATION_LINKS = [
   { path: "/coordination/analytics", label: "Analytics" },
 ];
 
+function HamburgerButton({ open, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={open ? "Close menu" : "Open menu"}
+      aria-expanded={open}
+      className="md:hidden w-9 h-9 rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-container transition-colors shrink-0"
+    >
+      <span className="material-symbols-outlined text-[24px]">{open ? "close" : "menu"}</span>
+    </button>
+  );
+}
+
+// Full-width link list shown under the header bar on phones/small tablets,
+// where the inline nav is hidden.
+function MobileNav({ links, pathname, activeClass }) {
+  return (
+    <nav className="md:hidden border-t border-surface-container-highest bg-surface max-h-[calc(100vh-4rem)] overflow-y-auto">
+      <div className="px-margin-mobile py-space-xs flex flex-col gap-0.5">
+        {links.map((link) => (
+          <Link
+            key={link.path}
+            to={link.path}
+            className={
+              pathname === link.path
+                ? `${activeClass} text-on-primary font-label-md text-label-md rounded-lg px-3 py-2.5`
+                : "font-label-md text-label-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-lg px-3 py-2.5 transition-colors"
+            }
+          >
+            {link.label}
+          </Link>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
 // variant: "responder" (vermilion, top nav across the community/responder
 // side) or "coordination" (indigo, top nav across the govt console)
 export default function Header({ variant = "responder" }) {
   const location = useLocation();
   const { user, logout, isCoordination, isResponder } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false); // mobile hamburger menu
   const menuRef = useRef(null);
+
+  // Close the mobile menu whenever the page changes
+  useEffect(() => {
+    setNavOpen(false);
+  }, [location.pathname]);
 
   // Close the login dropdown on outside click
   useEffect(() => {
@@ -93,8 +137,10 @@ export default function Header({ variant = "responder" }) {
             >
               <span className="material-symbols-outlined text-on-primary text-[18px]">logout</span>
             </button>
+            <HamburgerButton open={navOpen} onClick={() => setNavOpen((v) => !v)} />
           </div>
         </div>
+        {navOpen && <MobileNav links={COORDINATION_LINKS} pathname={location.pathname} activeClass="bg-[#184681]" />}
       </header>
     );
   }
@@ -128,6 +174,11 @@ export default function Header({ variant = "responder" }) {
           ))}
         </nav>
         <div className="flex items-center gap-space-sm shrink-0">
+          {/* On desktop this sits inside the nav; on phones the nav is
+              collapsed, so keep it reachable in the top bar. */}
+          <div className="md:hidden">
+            <EmergencyContacts />
+          </div>
 
           {user ? (
             <button
@@ -168,8 +219,10 @@ export default function Header({ variant = "responder" }) {
               )}
             </div>
           )}
+          <HamburgerButton open={navOpen} onClick={() => setNavOpen((v) => !v)} />
         </div>
       </div>
+      {navOpen && <MobileNav links={links} pathname={location.pathname} activeClass="bg-primary-container" />}
     </header>
   );
 }
