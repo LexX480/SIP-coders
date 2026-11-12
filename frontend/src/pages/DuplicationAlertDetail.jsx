@@ -70,7 +70,7 @@ export default function DuplicationAlertDetail() {
   const isNeed = alert.kind === "need";
   const count = isNeed ? alert.reportCount : alert.organizationCount;
   const summary = isNeed
-    ? `${count} separate report${count === 1 ? "" : "s"} for the same need were submitted here — likely the same household or neighbors.`
+    ? `${count} separate report${count === 1 ? "" : "s"} for the same need were submitted here - likely the same household or neighbors.`
     : `${count} organizations reported delivering ${alert.resourceType} here.`;
 
   return (
