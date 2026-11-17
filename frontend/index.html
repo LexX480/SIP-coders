@@ -13,10 +13,129 @@
       rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
       rel="stylesheet" />
+
+    <!-- Instant splash: shows before any JavaScript has loaded -->
+    <style>
+      body {
+        margin: 0;
+      }
+
+      .sr-splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #F7F6F2;
+        font-family: Inter, system-ui, sans-serif;
+        text-align: center;
+      }
+
+      .sr-splash__badge {
+        position: relative;
+        width: 96px;
+        height: 96px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .sr-splash__track,
+      .sr-splash__spin {
+        position: absolute;
+        inset: 0;
+        border-radius: 9999px;
+        border: 3px solid rgba(24, 70, 129, .12);
+      }
+
+      .sr-splash__spin {
+        border-color: transparent;
+        border-top-color: #184681;
+        border-right-color: #184681;
+        animation: sr-splash-spin 1.1s cubic-bezier(.55, .15, .45, .85) infinite;
+      }
+
+      .sr-splash__logo {
+        width: 56px;
+        height: 56px;
+        object-fit: contain;
+        border-radius: 12px;
+      }
+
+      .sr-splash__brand {
+        margin: 24px 0 0;
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -.01em;
+        color: #184681;
+      }
+
+      .sr-splash__tag {
+        margin: 8px 0 0;
+        font-size: 12px;
+        letter-spacing: .04em;
+        color: #8A8578;
+      }
+
+      .sr-splash__bar {
+        margin-top: 22px;
+        width: 160px;
+        height: 3px;
+        border-radius: 9999px;
+        background: rgba(24, 70, 129, .12);
+        overflow: hidden;
+      }
+
+      .sr-splash__bar span {
+        display: block;
+        height: 100%;
+        width: 40%;
+        border-radius: 9999px;
+        background: #184681;
+        animation: sr-splash-slide 1.3s ease-in-out infinite;
+      }
+
+      @keyframes sr-splash-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @keyframes sr-splash-slide {
+        0% {
+          transform: translateX(-110%);
+        }
+
+        100% {
+          transform: translateX(260%);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+
+        .sr-splash__spin,
+        .sr-splash__bar span {
+          animation: none;
+        }
+      }
+    </style>
   </head>
 
   <body class="bg-background antialiased">
-    <div id="root"></div>
+    <div id="root">
+      <!-- React replaces everything inside #root when the app starts -->
+      <div class="sr-splash" role="status" aria-label="Loading">
+        <div class="sr-splash__badge">
+          <span class="sr-splash__track"></span>
+          <span class="sr-splash__spin"></span>
+          <img class="sr-splash__logo" src="/logo-icon.png" alt="" />
+        </div>
+        <p class="sr-splash__brand">SaajhaRahat</p>
+        <p class="sr-splash__tag">Coordinate relief, not duplication</p>
+        <div class="sr-splash__bar"><span></span></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 
