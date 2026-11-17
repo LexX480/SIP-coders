@@ -139,3 +139,11 @@ export const confirmDropoff = (id, confirmedQuantity) =>
 
 export const cancelDropoff = (id, note) =>
   client.patch(`/dropoffs/${id}/cancel`, note ? { note } : {}).then((r) => r.data);
+
+
+// --- Deliveries (sent out, not yet logged) ------------------------------------
+export const startDelivery = (payload) => client.post("/deliveries", payload).then((r) => r.data);
+export const getMyDeliveries = () => client.get("/deliveries/mine").then((r) => r.data);
+export const markDeliveryArrived = (id) => client.patch(`/deliveries/${id}/deliver`).then((r) => r.data);
+export const restoreDelivery = (id) => client.patch(`/deliveries/${id}/revert`).then((r) => r.data);
+export const cancelDelivery = (id) => client.patch(`/deliveries/${id}/cancel`).then((r) => r.data);

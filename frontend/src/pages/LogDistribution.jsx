@@ -3,7 +3,16 @@ import { useLocation, useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import ResourceGrid, { RESOURCES, SUBCATEGORIES } from "../components/ResourceGrid";
 import MapPicker from "../components/MapPicker";
-import { getWards, logDistribution, markNeedAddressed } from "../api/client";
+import {
+  cancelDelivery,
+  getMyDeliveries,
+  getWards,
+  logDistribution,
+  markDeliveryArrived,
+  markNeedAddressed,
+  restoreDelivery,
+  startDelivery,
+} from "../api/client";
 import { useAuth } from "../context/AuthContext";
 
 const CATEGORY_LABELS = {
@@ -24,6 +33,20 @@ function wardLabel(ward) {
   return parts.join(", ");
 }
 
+function timeAgo(dateStr) {
+  const mins = Math.round((Date.now() - new Date(dateStr).getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
+function apiError(err, fallback) {
+  const data = err.response?.data;
+  return data?.message || data?.errors?.[0]?.msg || fallback;
+}
+
 export default function LogDistribution() {
   const routerLocation = useLocation();
   const prefill = routerLocation.state?.prefill;
@@ -33,17 +56,29 @@ export default function LogDistribution() {
   const [coordinates, setCoordinates] = useState(prefill?.coordinates || null);
   const [wardId, setWardId] = useState(prefill?.wardId || "");
   const [quantity, setQuantity] = useState(prefill?.quantity ? String(prefill.quantity) : "");
-  const [needId] = useState(prefill?.needId || null);
+  const [needId, setNeedId] = useState(prefill?.needId || null);
   const [wards, setWards] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
+  const [resultHadNeed, setResultHadNeed] = useState(false);
   const [error, setError] = useState("");
+
+  // Deliveries that have been sent out but haven't arrived yet
+  const [deliveries, setDeliveries] = useState([]);
+  const [deliveriesLoading, setDeliveriesLoading] = useState(true);
+  const [deliveryBusyId, setDeliveryBusyId] = useState(null);
+  const [deliveryError, setDeliveryError] = useState("");
+  const [deliveryNotice, setDeliveryNotice] = useState("");
 
   const navigate = useNavigate();
   const { user } = useAuth();
 
   useEffect(() => {
     getWards().then(setWards).catch(() => setError("Could not load wards."));
+    getMyDeliveries()
+      .then(setDeliveries)
+      .catch(() => setDeliveryError("Could not load your deliveries on the way."))
+      .finally(() => setDeliveriesLoading(false));
   }, []);
 
   // Skip the nearest-ward auto-pick when we already know the ward from a
@@ -82,34 +117,104 @@ export default function LogDistribution() {
 
   const canSubmit = resourceType && coordinates && wardId && Number(quantity) > 0 && !submitting;
 
+  // Submitting no longer logs anything publicly - it sends the delivery out.
+  // It's only logged (public register, analytics, duplicate check) once the
+  // responder presses "Mark delivered" on it.
   async function handleSubmit() {
     setSubmitting(true);
     setError("");
+    setDeliveryError("");
     try {
-      const data = await logDistribution({
+      const created = await startDelivery({
         resourceType,
         subCategory: subCategory || undefined,
         quantity: Number(quantity),
         ward: wardId,
         location: { coordinates },
+        need: needId || undefined,
+      });
+      setDeliveries((d) => [created, ...d]);
+      setDeliveryNotice("Delivery is on its way. Mark it delivered once it reaches the location.");
+
+      // Fresh form for the next delivery
+      setResourceType("");
+      setSubCategory("");
+      setQuantity("");
+      setCoordinates(null);
+      setWardId("");
+      setNeedId(null);
+    } catch (err) {
+      setError(apiError(err, "Could not start this delivery."));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleDelivered(delivery) {
+    setDeliveryBusyId(delivery._id);
+    setDeliveryError("");
+    setDeliveryNotice("");
+
+    // 1. Claim the arrival first (atomic), so a double click can't log twice.
+    let arrived;
+    try {
+      arrived = await markDeliveryArrived(delivery._id);
+    } catch (err) {
+      setDeliveryError(apiError(err, "Could not mark this delivered."));
+      getMyDeliveries().then(setDeliveries).catch(() => { });
+      setDeliveryBusyId(null);
+      return;
+    }
+
+    // 2. Now it has really arrived, log it to the public register.
+    try {
+      const data = await logDistribution({
+        resourceType: arrived.resourceType,
+        subCategory: arrived.subCategory || undefined,
+        quantity: arrived.quantity,
+        ward: arrived.ward?._id || arrived.ward,
+        location: { coordinates: arrived.location.coordinates },
       });
 
-      // Best-effort: if this log came from claiming a community need,
-      // close the loop by marking that need addressed. A failure here
-      // shouldn't block the responder from seeing their successful log.
-      if (needId) {
+      // Best-effort: close out the community need this delivery came from.
+      if (arrived.need) {
         try {
-          await markNeedAddressed(needId);
+          await markNeedAddressed(arrived.need);
         } catch {
           // ignore - the distribution itself already succeeded
         }
       }
 
+      setDeliveries((d) => d.filter((x) => x._id !== delivery._id));
+      setResultHadNeed(Boolean(arrived.need));
       setResult(data);
     } catch (err) {
-      setError(err.response?.data?.message || "Could not log this distribution.");
+      // Logging failed: put it back on the way so nothing is lost.
+      try {
+        await restoreDelivery(delivery._id);
+      } catch {
+        // ignore - the list refresh below shows the true state
+      }
+      setDeliveryError(apiError(err, "Could not log this distribution. It is still on its way - try again."));
+      getMyDeliveries().then(setDeliveries).catch(() => { });
     } finally {
-      setSubmitting(false);
+      setDeliveryBusyId(null);
+    }
+  }
+
+  async function handleCancelDelivery(delivery) {
+    setDeliveryBusyId(delivery._id);
+    setDeliveryError("");
+    setDeliveryNotice("");
+    try {
+      await cancelDelivery(delivery._id);
+      setDeliveries((d) => d.filter((x) => x._id !== delivery._id));
+      setDeliveryNotice("Delivery cancelled. Nothing was logged.");
+    } catch (err) {
+      setDeliveryError(apiError(err, "Could not cancel this delivery."));
+      getMyDeliveries().then(setDeliveries).catch(() => { });
+    } finally {
+      setDeliveryBusyId(null);
     }
   }
 
@@ -126,21 +231,29 @@ export default function LogDistribution() {
               {flagged ? "warning" : "check_circle"}
             </span>
             <h1 className="font-headline-md text-headline-md text-on-surface mb-space-xs">
-              {flagged ? "Logged — possible duplicate flagged" : "Distribution logged"}
+              {flagged ? "Delivered — possible duplicate flagged" : "Delivered and logged"}
             </h1>
             <p className="font-body-md text-body-md text-on-surface-variant mb-space-lg">
               {flagged
                 ? result.distribution.duplicateNote
-                : needId
-                  ? "This distribution is now visible on the public transparency dashboard, and the community need report it resolved has been closed out."
-                  : "This distribution is now visible on the public transparency dashboard."}
+                : resultHadNeed
+                  ? "It reached the location, so it is now visible on the public transparency dashboard, and the community need report it resolved has been closed out."
+                  : "It reached the location, so it is now visible on the public transparency dashboard."}
             </p>
-            <button
-              onClick={() => navigate("/responder/distributions")}
-              className="h-11 px-6 rounded-lg bg-secondary text-on-secondary font-label-md text-label-md shadow-sm hover:opacity-95 transition-opacity"
-            >
-              View My Distributions
-            </button>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-space-sm">
+              <button
+                onClick={() => navigate("/responder/distributions")}
+                className="h-11 px-6 rounded-lg bg-secondary text-on-secondary font-label-md text-label-md shadow-sm hover:opacity-95 transition-opacity"
+              >
+                View My Distributions
+              </button>
+              <button
+                onClick={() => setResult(null)}
+                className="h-11 px-6 rounded-lg border border-surface-container-highest text-on-surface font-label-md text-label-md hover:bg-surface-container-low transition-colors"
+              >
+                Back to deliveries
+              </button>
+            </div>
           </div>
         </main>
       </div>
@@ -225,96 +338,201 @@ export default function LogDistribution() {
               </div>
             </div>
 
-            <div className="p-space-md rounded-xl bg-surface-container-lowest border border-surface-container-highest shadow-sm">
-              <div className="flex items-center justify-between mb-space-md">
-                <div>
-                  <p className="font-label-sm text-label-sm text-secondary uppercase tracking-wider">Step 03</p>
-                  <h2 className="font-headline-sm text-headline-sm text-on-surface">Confirm Log</h2>
-                </div>
-                <span className="font-caption text-caption text-on-surface-variant">Final Review</span>
-              </div>
-
-              <div className="space-y-space-sm">
-                <ConfirmRow
-                  label="Resource Category"
-                  value={selectedResource ? CATEGORY_LABELS[selectedResource.value] : "—"}
-                />
-
-                {selectedSubLabel && (
-                  <ConfirmRow label="Specific Item" value={selectedSubLabel} bordered />
-                )}
-
-                <div className="flex items-center justify-between py-space-xs border-t border-surface-container-highest pt-space-sm">
-                  <span className="font-label-md text-label-md text-on-surface-variant">Distribution Volume</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setQuantity((q) => String(Math.max(1, Number(q || 0) - 1)))}
-                      className="w-7 h-7 rounded-full border border-surface-container-highest flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest active:scale-95 transition"
-                      aria-label="Decrease quantity"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">remove</span>
-                    </button>
-                    <input
-                      type="number"
-                      min={1}
-                      value={quantity}
-                      onChange={(e) => setQuantity(e.target.value)}
-                      placeholder="0"
-                      className="w-12 text-center bg-surface-container-highest/40 rounded-md py-1 font-label-md text-label-md text-on-surface focus:outline-none focus:ring-1 focus:ring-secondary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setQuantity((q) => String(Number(q || 0) + 1))}
-                      className="w-7 h-7 rounded-full border border-surface-container-highest flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest active:scale-95 transition"
-                      aria-label="Increase quantity"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">add</span>
-                    </button>
+            <div className="flex flex-col gap-space-md">
+              <div className="p-space-md rounded-xl bg-surface-container-lowest border border-surface-container-highest shadow-sm">
+                <div className="flex items-center justify-between mb-space-md">
+                  <div>
+                    <p className="font-label-sm text-label-sm text-secondary uppercase tracking-wider">Step 03</p>
+                    <h2 className="font-headline-sm text-headline-sm text-on-surface">Confirm Log</h2>
                   </div>
+                  <span className="font-caption text-caption text-on-surface-variant">Final Review</span>
                 </div>
 
-                <div className="flex items-center justify-between py-space-xs border-t border-surface-container-highest pt-space-sm">
-                  <span className="font-label-md text-label-md text-on-surface-variant">Distribution Location</span>
-                  <div className="text-right">
-                    <span className="font-label-md text-label-md text-on-surface flex items-center justify-end gap-1">
-                      <span className="material-symbols-outlined text-[14px] text-on-surface-variant">location_on</span>
-                      {coordinates
-                        ? `${coordinates[1].toFixed(4)}°, ${coordinates[0].toFixed(4)}°`
-                        : "—"}
-                    </span>
-                    {selectedWard && (
-                      <span className="font-caption text-caption text-on-surface-variant block">
-                        {wardLabel(selectedWard)}
+                <div className="space-y-space-sm">
+                  <ConfirmRow
+                    label="Resource Category"
+                    value={selectedResource ? CATEGORY_LABELS[selectedResource.value] : "—"}
+                  />
+
+                  {selectedSubLabel && (
+                    <ConfirmRow label="Specific Item" value={selectedSubLabel} bordered />
+                  )}
+
+                  <div className="flex items-center justify-between py-space-xs border-t border-surface-container-highest pt-space-sm">
+                    <span className="font-label-md text-label-md text-on-surface-variant">Distribution Volume</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setQuantity((q) => String(Math.max(1, Number(q || 0) - 1)))}
+                        className="w-7 h-7 rounded-full border border-surface-container-highest flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest active:scale-95 transition"
+                        aria-label="Decrease quantity"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">remove</span>
+                      </button>
+                      <input
+                        type="number"
+                        min={1}
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value)}
+                        placeholder="0"
+                        className="w-12 text-center bg-surface-container-highest/40 rounded-md py-1 font-label-md text-label-md text-on-surface focus:outline-none focus:ring-1 focus:ring-secondary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setQuantity((q) => String(Number(q || 0) + 1))}
+                        className="w-7 h-7 rounded-full border border-surface-container-highest flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest active:scale-95 transition"
+                        aria-label="Increase quantity"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">add</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between py-space-xs border-t border-surface-container-highest pt-space-sm">
+                    <span className="font-label-md text-label-md text-on-surface-variant">Distribution Location</span>
+                    <div className="text-right">
+                      <span className="font-label-md text-label-md text-on-surface flex items-center justify-end gap-1">
+                        <span className="material-symbols-outlined text-[14px] text-on-surface-variant">location_on</span>
+                        {coordinates
+                          ? `${coordinates[1].toFixed(4)}°, ${coordinates[0].toFixed(4)}°`
+                          : "—"}
                       </span>
-                    )}
+                      {selectedWard && (
+                        <span className="font-caption text-caption text-on-surface-variant block">
+                          {wardLabel(selectedWard)}
+                        </span>
+                      )}
+                    </div>
                   </div>
+
+                  <ConfirmRow
+                    label="Field Team Lead"
+                    value={user?.organizationName || "—"}
+                    bordered
+                  />
+                  <ConfirmRow label="Timestamp" value={`Today, ${timestamp} NPT`} bordered />
                 </div>
 
-                <ConfirmRow
-                  label="Field Team Lead"
-                  value={user?.organizationName || "—"}
-                  bordered
-                />
-                <ConfirmRow label="Timestamp" value={`Today, ${timestamp} NPT`} bordered />
+                <button
+                  onClick={handleSubmit}
+                  disabled={!canSubmit}
+                  className="w-full h-12 mt-space-md rounded-lg bg-secondary text-on-secondary font-label-md text-label-md flex items-center justify-center gap-2 shadow-sm disabled:opacity-40 hover:opacity-95 transition-opacity"
+                >
+                  <span className="material-symbols-outlined text-[18px]">local_shipping</span>
+                  <span>{submitting ? "Sending out..." : "Send Out for Delivery"}</span>
+                </button>
+                <p className="font-caption text-caption text-on-surface-variant text-center mt-space-xs flex items-center justify-center gap-1">
+                  <span className="material-symbols-outlined text-[13px]">lock</span>
+                  Logged to the public relief register once you mark it delivered
+                </p>
               </div>
 
-              <button
-                onClick={handleSubmit}
-                disabled={!canSubmit}
-                className="w-full h-12 mt-space-md rounded-lg bg-secondary text-on-secondary font-label-md text-label-md flex items-center justify-center gap-2 shadow-sm disabled:opacity-40 hover:opacity-95 transition-opacity"
-              >
-                <span className="material-symbols-outlined text-[18px]">sync</span>
-                <span>{submitting ? "Submitting..." : "Submit Distribution"}</span>
-              </button>
-              <p className="font-caption text-caption text-on-surface-variant text-center mt-space-xs flex items-center justify-center gap-1">
-                <span className="material-symbols-outlined text-[13px]">lock</span>
-                Immutable entry recorded to public relief register
-              </p>
+              <DeliveriesInProgress
+                deliveries={deliveries}
+                loading={deliveriesLoading}
+                busyId={deliveryBusyId}
+                error={deliveryError}
+                notice={deliveryNotice}
+                onDelivered={handleDelivered}
+                onCancel={handleCancelDelivery}
+              />
             </div>
           </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+// Small panel under "Confirm Log": everything that has been sent out and is
+// still on its way. A delivery only becomes a public distribution when the
+// responder presses "Mark delivered" on it.
+function DeliveriesInProgress({ deliveries, loading, busyId, error, notice, onDelivered, onCancel }) {
+  return (
+    <div className="p-space-md rounded-xl bg-surface-container-lowest border border-surface-container-highest shadow-sm">
+      <div className="flex items-center justify-between mb-space-xs">
+        <div className="flex items-center gap-space-sm">
+          <div className="w-8 h-8 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center shrink-0">
+            <span className="material-symbols-outlined text-[18px]">local_shipping</span>
+          </div>
+          <h2 className="font-headline-sm text-headline-sm text-on-surface">On the way</h2>
+        </div>
+        {deliveries.length > 0 && (
+          <span className="px-2 py-0.5 rounded-full bg-secondary/10 text-secondary font-label-sm text-label-sm">
+            {deliveries.length}
+          </span>
+        )}
+      </div>
+      <p className="font-caption text-caption text-on-surface-variant mb-space-sm">
+        Deliveries are only logged once they reach the location. Press delivered when yours arrives.
+      </p>
+
+      {notice && (
+        <div className="flex items-start gap-1.5 p-space-sm rounded-lg bg-status-confirmed/10 text-status-confirmed font-caption text-caption mb-space-sm">
+          <span className="material-symbols-outlined text-[16px] shrink-0">check_circle</span>
+          <span>{notice}</span>
+        </div>
+      )}
+      {error && <p className="font-caption text-caption text-status-critical mb-space-sm">{error}</p>}
+
+      <div className="flex flex-col gap-space-sm">
+        {loading && <p className="font-body-sm text-body-sm text-on-surface-variant">Loading...</p>}
+
+        {deliveries.map((d) => {
+          const busy = busyId === d._id;
+          const sub = (SUBCATEGORIES[d.resourceType] || []).find((x) => x.value === d.subCategory)?.label;
+          return (
+            <div key={d._id} className="rounded-lg border border-surface-container-highest p-space-sm">
+              <div className="flex items-start justify-between gap-space-sm">
+                <div className="min-w-0">
+                  <p className="font-label-md text-label-md text-on-surface">
+                    {d.quantity} × {CATEGORY_LABELS[d.resourceType] || d.resourceType}
+                  </p>
+                  {sub && <p className="font-caption text-caption text-on-surface-variant">{sub}</p>}
+                  <p className="font-caption text-caption text-on-surface-variant flex items-center gap-1 mt-0.5">
+                    <span className="material-symbols-outlined text-[13px]">location_on</span>
+                    <span className="truncate">{wardLabel(d.ward) || "Selected location"}</span>
+                  </p>
+                  <p className="font-caption text-caption text-on-surface-variant">Sent {timeAgo(d.createdAt)}</p>
+                </div>
+                <span className="shrink-0 flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-status-pending/10 text-status-pending font-label-sm text-label-sm">
+                  <span className="relative flex w-1.5 h-1.5">
+                    <span className="absolute inline-flex w-full h-full rounded-full bg-status-pending opacity-60 animate-ping" />
+                    <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-status-pending" />
+                  </span>
+                  On the way
+                </span>
+              </div>
+              <div className="flex gap-space-xs mt-space-sm">
+                <button
+                  type="button"
+                  onClick={() => onDelivered(d)}
+                  disabled={busy}
+                  className="flex-1 h-10 rounded-lg bg-status-confirmed text-white font-label-md text-label-md shadow-sm hover:opacity-95 transition-opacity disabled:opacity-60 flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[18px]">task_alt</span>
+                  {busy ? "Saving..." : "Mark delivered"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onCancel(d)}
+                  disabled={busy}
+                  title="Cancel - it never went out"
+                  className="h-10 px-3 rounded-lg border border-surface-container-highest text-on-surface-variant font-label-md text-label-md hover:bg-surface-container-low transition-colors disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          );
+        })}
+
+        {!loading && deliveries.length === 0 && (
+          <p className="font-body-sm text-body-sm text-on-surface-variant">
+            Nothing on the way. Send a delivery out above and it will wait here until it arrives.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
