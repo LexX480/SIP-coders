@@ -44,14 +44,34 @@ const WARDS = [
   { name: "Ward 32", district: "Kathmandu", locality: "Koteshwor", location: { type: "Point", coordinates: [85.3480, 27.6780] } },
 ];
 
-async function run() {
-  await mongoose.connect(process.env.MONGO_URI);
-  console.log("Connected for seeding...");
+// Usage:
+//   npm run seed                    wards only, and only if there are none yet
+//   npm run seed -- --demo          also create the two demo accounts (local dev only!)
+//   npm run seed -- --reset-wards   wipe and re-create the wards (new ids - never do this
+//                                   once real needs/distributions/warehouses exist)
+//
+// For a live database, put these in your local .env just for the run, then remove them:
+//   ADMIN_EMAIL=you@example.com
+//   ADMIN_PASSWORD=<a strong password>
+//   ADMIN_NAME=Your Name          (optional)
+// A coordinator account is created from them if that email doesn't exist yet.
+const args = process.argv.slice(2);
+const WITH_DEMO = args.includes("--demo");
+const RESET_WARDS = args.includes("--reset-wards");
 
+async function seedWards() {
+  const existing = await Ward.countDocuments();
+  if (existing > 0 && !RESET_WARDS) {
+    console.log(`Wards already exist (${existing}) - leaving them alone. Use --reset-wards to replace them.`);
+    return;
+  }
+  if (existing > 0) console.warn(`--reset-wards: replacing ${existing} existing wards (ward ids will change).`);
   await Ward.deleteMany({});
   const wards = await Ward.insertMany(WARDS);
   console.log(`Seeded ${wards.length} wards`);
+}
 
+async function seedDemoUsers() {
   await User.deleteMany({ email: { $in: ["demo-responder@saajharahat.test", "demo-coord@saajharahat.test"] } });
 
   const responder = new User({
@@ -74,6 +94,44 @@ async function run() {
   await coordUser.setPassword("Password123!");
   await coordUser.save();
   console.log("Seeded demo coordination user: demo-coord@saajharahat.test / Password123!");
+}
+
+// A real coordinator account for a live deployment, from ADMIN_* env vars.
+async function seedAdmin() {
+  const email = (process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+  const password = process.env.ADMIN_PASSWORD || "";
+  if (!email && !password) return;
+  if (!email || !password) {
+    console.warn("ADMIN_EMAIL and ADMIN_PASSWORD must both be set - skipping coordinator account.");
+    return;
+  }
+  if (password.length < 10) {
+    console.warn("ADMIN_PASSWORD is shorter than 10 characters - skipping coordinator account.");
+    return;
+  }
+  if (await User.findOne({ email })) {
+    console.log(`Coordinator ${email} already exists - leaving it alone.`);
+    return;
+  }
+
+  const admin = new User({
+    role: "ward_committee",
+    fullName: process.env.ADMIN_NAME || "Ward Coordinator",
+    email,
+    verified: true,
+  });
+  await admin.setPassword(password);
+  await admin.save();
+  console.log(`Created coordinator account: ${email}`);
+}
+
+async function run() {
+  await mongoose.connect(process.env.MONGO_URI);
+  console.log("Connected for seeding...");
+
+  await seedWards();
+  if (WITH_DEMO) await seedDemoUsers();
+  await seedAdmin();
 
   await mongoose.disconnect();
   console.log("Done.");
