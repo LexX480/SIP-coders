@@ -14,7 +14,7 @@ const dashboardRoutes = require("./routes/dashboard.routes");
 const warehousesRoutes = require("./routes/warehouses.routes");
 const dropoffsRoutes = require("./routes/dropoffs.routes");
 const dispatchesRoutes = require("./routes/dispatches.routes");
-const logisticsAnalyticsRoutes = require("./routes/Logistics.analytics.routes");
+const logisticsAnalyticsRoutes = require("./routes/logistics.analytics.routes");
 const deliveriesRoutes = require("./routes/deliveries.routes");
 
 
